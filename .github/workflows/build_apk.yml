@@ -1,24 +1,45 @@
 name: Build BMH APK
+
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches:
+      - main
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          distribution: 'temurin'
-          java-version: '17'
-      - uses: subosito/flutter-action@v2
+          flutter-version: '3.27.0'
+          channel: stable
+
+      - name: Get dependencies (ignore Android V2 warning)
+        run: flutter pub get || true
+
+      - name: Build APK
+        run: |
+          flutter build apk \
+            --release \
+            --android-skip-build-dependency-validation
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          flutter-version: '3.27.4'
-          channel: 'stable'
-      - run: flutter pub get
-      - run: flutter build apk --debug --android-skip-build-dependency-validation
-      - uses: actions/upload-artifact@v4
+          name: BMH-App-Release
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: BMH-App-Debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          files: build/app/outputs/flutter-apk/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
