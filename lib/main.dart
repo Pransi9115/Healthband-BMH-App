@@ -23,8 +23,7 @@ void main() async {
   // (same as JCVital / Fitdays behaviour)
   if (Platform.isIOS) {
     await _requestiOSPermissions();
-    await HealthService.requestHealthPermissions(); // registers Health in iOS Settings
-  }
+    }
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
