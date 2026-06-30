@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- HealthKit Capability -->
+	<key>com.apple.developer.healthkit</key>
+	<true/>
+	
+	<!-- HealthKit Access -->
+	<key>com.apple.developer.healthkit.access</key>
+	<array>
+		<string>HKHealthStore</string>
+	</array>
+	
+	<!-- Background Modes for Health Sync -->
+	<key>com.apple.developer.background-modes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+		<string>location</string>
+	</array>
+	
+	<!-- Push Notifications (optional) -->
+	<key>aps-environment</key>
+	<string>production</string>
+</dict>
+</plist>

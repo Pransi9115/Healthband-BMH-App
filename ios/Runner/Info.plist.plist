@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>HealthBand</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	
+	<!-- ═══════════════════════════════════════════════════════ -->
+	<!-- HEALTHBAND HEALTH INTEGRATION KEYS - DO NOT REMOVE -->
+	<!-- ═══════════════════════════════════════════════════════ -->
+	
+	<!-- HealthKit Permissions -->
+	<key>NSHealthShareUsageDescription</key>
+	<string>HealthBand needs access to your Apple Health data to sync your vital measurements including heart rate, blood oxygen, blood pressure, temperature, steps, and sleep data</string>
+	
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>HealthBand needs permission to update your Apple Health with your vital readings from your wearable band</string>
+	
+	<!-- Location Permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>HealthBand uses your location to provide health context and track your activity patterns</string>
+	
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>HealthBand needs your location at all times to provide continuous health monitoring and activity tracking</string>
+	
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>HealthBand needs access to your location for accurate health and activity tracking</string>
+	
+	<!-- Bluetooth Permissions -->
+	<key>NSBluetoothAlwaysAndWhenInUseUsageDescription</key>
+	<string>HealthBand connects to your wearable device via Bluetooth to sync your vital measurements</string>
+	
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>HealthBand needs Bluetooth to communicate with your health band and receive vital data</string>
+	
+	<!-- Camera Permission (Optional) -->
+	<key>NSCameraUsageDescription</key>
+	<string>HealthBand may use your camera for health scanning features like heart rate detection</string>
+	
+	<!-- Background Modes for Health Sync -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+		<string>location</string>
+	</array>
+	
+	<!-- ═══════════════════════════════════════════════════════ -->
+	<!-- END OF HEALTHBAND KEYS -->
+	<!-- ═══════════════════════════════════════════════════════ -->
+	
+</dict>
+</plist>

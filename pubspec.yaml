@@ -10,6 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_background: ^0.2.0
+  health: ^8.2.0
+  permission_handler: ^11.4.0
+  workmanager: ^0.5.1  
   flutter_riverpod: ^2.4.9
   riverpod_annotation: ^2.3.3
   go_router: ^13.0.0
