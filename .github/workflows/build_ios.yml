@@ -19,13 +19,19 @@ jobs:
           flutter-version: '3.27.0'
           channel: stable
 
+      - name: Clean pub cache
+        run: rm -rf ~/.pub-cache
+
       - name: Get dependencies (ignore Android V2 warning)
         run: flutter pub get || true
+
+      - name: Clean Flutter
+        run: flutter clean
 
       - name: Install pods
         run: |
           cd ios
-          rm -rf Pods Podfile.lock
+          rm -rf Pods Podfile.lock .symlinks/ Flutter/Flutter.framework Flutter/Flutter.podspec
           pod install --repo-update
           cd ..
 
