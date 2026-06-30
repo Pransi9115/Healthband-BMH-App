@@ -1,0 +1,92 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- BLE — Health Band + BioScale -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
+    <!-- Location required for BLE scan on Android 6-11 -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Network -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Wake lock for active workouts -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- BLE keep alive in background -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
+    <!-- Google Health Connect -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE"/>
+    <uses-permission android:name="android.permission.health.READ_STEPS"/>
+    <uses-permission android:name="android.permission.health.WRITE_STEPS"/>
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION"/>
+    <uses-permission android:name="android.permission.health.WRITE_OXYGEN_SATURATION"/>
+    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE"/>
+    <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE"/>
+    <uses-permission android:name="android.permission.health.READ_SLEEP"/>
+    <uses-permission android:name="android.permission.health.WRITE_SLEEP"/>
+    <uses-permission android:name="android.permission.health.READ_BODY_TEMPERATURE"/>
+    <uses-permission android:name="android.permission.health.WRITE_BODY_TEMPERATURE"/>
+    <uses-permission android:name="android.permission.health.READ_BLOOD_GLUCOSE"/>
+    <uses-permission android:name="android.permission.health.WRITE_BLOOD_GLUCOSE"/>
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY"/>
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE_VARIABILITY"/>
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED"/>
+    <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED"/>
+    <uses-permission android:name="android.permission.health.READ_DISTANCE"/>
+    <uses-permission android:name="android.permission.health.WRITE_DISTANCE"/>
+
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
+	<application
+        android:label="BMH"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"/>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <!-- Health Connect — required activity-alias so the permissions
+             screen can show a link back to your privacy policy. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity-alias>
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <queries>
+        <package android:name="com.google.android.apps.healthdata"/>
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>
