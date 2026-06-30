@@ -5,10 +5,16 @@ plugins {
 }
 
 android {
-    namespace = "com.biohealthcare.bmh_app"
-    compileSdk = 36
+    namespace "com.example.bmh_app"
+    compileSdkVersion flutter.compileSdkVersion
     ndkVersion = "28.2.13676358"
-
+	
+defaultConfig {
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+    }
     compileOptions {
     isCoreLibraryDesugaringEnabled = true
     sourceCompatibility = JavaVersion.VERSION_17
