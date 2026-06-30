@@ -4,13 +4,13 @@ publish_to: 'none'
 version: 1.0.0+65
 
 environment:
-  sdk: '>=2.19.0 <4.0.0'
-  flutter: ">=3.10.0"
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: ">=3.27.0"
 
 dependencies:
   flutter:
     sdk: flutter   
-  health: ^9.0.0
+  health: ^13.1.0
   permission_handler: ^11.0.0
   workmanager: ^0.5.1  
   flutter_riverpod: ^2.4.9
@@ -22,7 +22,7 @@ dependencies:
   dio: ^5.4.0
   retrofit: ^4.1.0
   google_fonts: ^6.1.0
-  fl_chart: ^0.40.0
+  fl_chart: ^0.65.0
   percent_indicator: ^4.2.3
   shimmer: ^3.0.0
   lottie: ^2.7.0
