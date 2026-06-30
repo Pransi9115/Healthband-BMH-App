@@ -25,14 +25,6 @@ defaultConfig {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
-    defaultConfig {
-        applicationId = "com.biohealthcare.bmh_app"
-        minSdk = 26
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
-    }
-
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
