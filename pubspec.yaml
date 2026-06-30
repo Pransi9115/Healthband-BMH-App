@@ -10,7 +10,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_background: ^0.2.0
   health: ^6.0.0
   permission_handler: ^11.4.0
   workmanager: ^0.5.1  
