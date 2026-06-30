@@ -22,7 +22,7 @@ dependencies:
   dio: ^5.4.0
   retrofit: ^4.1.0
   google_fonts: ^6.1.0
-  fl_chart: ^0.67.0
+  fi_chart: ^0.40.0
   percent_indicator: ^4.2.3
   shimmer: ^3.0.0
   lottie: ^3.0.0
