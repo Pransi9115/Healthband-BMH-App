@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.1.1
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -22,13 +22,13 @@ jobs:
       - name: Clean pub cache
         run: rm -rf ~/.pub-cache
 
-      - name: Get dependencies (ignore Android V2 warning)
-        run: flutter pub get || true
-
       - name: Clean Flutter
         run: flutter clean
 
-      - name: Install pods
+      - name: Get dependencies (MUST run first!)
+        run: flutter pub get
+
+      - name: Install pods (after flutter pub get)
         run: |
           cd ios
           rm -rf Pods Podfile.lock .symlinks/ Flutter/Flutter.framework Flutter/Flutter.podspec
