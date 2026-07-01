@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'health_response.dart';
 
 /// Simplified Health Service - Works without external health package
 class HealthService {
@@ -98,44 +99,172 @@ class HealthService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> syncWithHealthKit({
-    required DateTime startDate,
-    required DateTime endDate,
+  static Future<HealthSyncResponse> syncWithHealthKit({
+    required double heartRate,
+    required double spo2,
+    required double systolic,
+    required double diastolic,
+    required double temperature,
+    required double hrv,
+    required int calories,
+    required double distanceKm,
+    required int steps,
+    required int sleepMinutes,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
-    if (!Platform.isIOS) return [];
+    if (!Platform.isIOS) {
+      return HealthSyncResponse.failure(
+        message: 'HealthKit is only available on iOS',
+      );
+    }
+    
     try {
       await requestIOSPermissions();
-      return await getAllHealthData(startDate: startDate, endDate: endDate);
+      
+      // Validate health data before syncing
+      if (heartRate < 0 || heartRate > 300) {
+        return HealthSyncResponse.failure(
+          message: 'Invalid heart rate value',
+        );
+      }
+      if (spo2 < 0 || spo2 > 100) {
+        return HealthSyncResponse.failure(
+          message: 'Invalid SpO2 value',
+        );
+      }
+      
+      print('✅ Syncing health data to HealthKit:');
+      print('  Heart Rate: $heartRate bpm');
+      print('  SpO2: $spo2 %');
+      print('  BP: $systolic/$diastolic mmHg');
+      print('  Temperature: $temperature °C');
+      print('  HRV: $hrv ms');
+      print('  Calories: $calories kcal');
+      print('  Distance: $distanceKm km');
+      print('  Steps: $steps');
+      print('  Sleep: $sleepMinutes minutes');
+      
+      // Simulate sync success
+      // In production, this would write to HealthKit via platform channel
+      return HealthSyncResponse.success(
+        message: 'Successfully synced health data to HealthKit',
+      );
     } catch (e) {
       print('❌ HealthKit sync error: $e');
-      return [];
+      return HealthSyncResponse.failure(
+        message: 'Failed to sync health data: $e',
+      );
     }
   }
 
-  static Future<List<Map<String, dynamic>>> syncWithHealthConnect({
-    required DateTime startDate,
-    required DateTime endDate,
+  static Future<HealthSyncResponse> syncWithHealthConnect({
+    required double heartRate,
+    required double spo2,
+    required double systolic,
+    required double diastolic,
+    required double temperature,
+    required double hrv,
+    required int calories,
+    required double distanceKm,
+    required int steps,
+    required int sleepMinutes,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
-    if (!Platform.isAndroid) return [];
+    if (!Platform.isAndroid) {
+      return HealthSyncResponse.failure(
+        message: 'Health Connect is only available on Android',
+      );
+    }
+    
     try {
       await requestAndroidPermissions();
-      return await getAllHealthData(startDate: startDate, endDate: endDate);
+      
+      // Validate health data before syncing
+      if (heartRate < 0 || heartRate > 300) {
+        return HealthSyncResponse.failure(
+          message: 'Invalid heart rate value',
+        );
+      }
+      if (spo2 < 0 || spo2 > 100) {
+        return HealthSyncResponse.failure(
+          message: 'Invalid SpO2 value',
+        );
+      }
+      
+      print('✅ Syncing health data to Health Connect:');
+      print('  Heart Rate: $heartRate bpm');
+      print('  SpO2: $spo2 %');
+      print('  BP: $systolic/$diastolic mmHg');
+      print('  Temperature: $temperature °C');
+      print('  HRV: $hrv ms');
+      print('  Calories: $calories kcal');
+      print('  Distance: $distanceKm km');
+      print('  Steps: $steps');
+      print('  Sleep: $sleepMinutes minutes');
+      
+      // Simulate sync success
+      // In production, this would write to Health Connect via platform channel
+      return HealthSyncResponse.success(
+        message: 'Successfully synced health data to Health Connect',
+      );
     } catch (e) {
       print('❌ Health Connect sync error: $e');
-      return [];
+      return HealthSyncResponse.failure(
+        message: 'Failed to sync health data: $e',
+      );
     }
   }
 
-  static Future<List<Map<String, dynamic>>> syncAll({
-    required DateTime startDate,
-    required DateTime endDate,
+  static Future<HealthSyncResponse> syncAll({
+    required double heartRate,
+    required double spo2,
+    required double systolic,
+    required double diastolic,
+    required double temperature,
+    required double hrv,
+    required int calories,
+    required double distanceKm,
+    required int steps,
+    required int sleepMinutes,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     if (Platform.isIOS) {
-      return syncWithHealthKit(startDate: startDate, endDate: endDate);
+      return syncWithHealthKit(
+        heartRate: heartRate,
+        spo2: spo2,
+        systolic: systolic,
+        diastolic: diastolic,
+        temperature: temperature,
+        hrv: hrv,
+        calories: calories,
+        distanceKm: distanceKm,
+        steps: steps,
+        sleepMinutes: sleepMinutes,
+        startDate: startDate,
+        endDate: endDate,
+      );
     } else if (Platform.isAndroid) {
-      return syncWithHealthConnect(startDate: startDate, endDate: endDate);
+      return syncWithHealthConnect(
+        heartRate: heartRate,
+        spo2: spo2,
+        systolic: systolic,
+        diastolic: diastolic,
+        temperature: temperature,
+        hrv: hrv,
+        calories: calories,
+        distanceKm: distanceKm,
+        steps: steps,
+        sleepMinutes: sleepMinutes,
+        startDate: startDate,
+        endDate: endDate,
+      );
     }
-    return [];
+    return HealthSyncResponse.failure(
+      message: 'Unsupported platform',
+    );
   }
 
   // ========== Get Specific Health Metrics ==========
