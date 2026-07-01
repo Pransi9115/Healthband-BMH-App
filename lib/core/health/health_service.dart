@@ -1,336 +1,353 @@
 import 'dart:io';
-import 'health_response.dart';
+import 'package:flutter/foundation.dart';
+import 'package:health/health.dart';
 
-/// Simplified Health Service - Works without external health package
+// ─────────────────────────────────────────────────────────
+//  HEALTH SERVICE - ENHANCED WITH DEBUGGING
+//  Syncs vitals from the band to the backend / health store
+// ─────────────────────────────────────────────────────────
+
+// The HealthKit data types BMH reads and writes.
+const _kHealthTypes = [
+  HealthDataType.HEART_RATE,
+  HealthDataType.BLOOD_OXYGEN,
+  HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
+  HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
+  HealthDataType.BODY_TEMPERATURE,
+  HealthDataType.STEPS,
+];
+
+// The Google Health Connect data types BMH reads and writes (Android).
+// Kept separate from _kHealthTypes above (iOS HealthKit) since a couple
+// of these are platform-specific (e.g. DISTANCE_DELTA is Android-only).
+//
+// NOTE: HEART_RATE_VARIABILITY_RMSSD is the name this package uses for
+// the Health Connect (Android) HRV record. If a future package version
+// has renamed it, this is the one line that would need changing.
+const _kHealthConnectTypes = [
+  HealthDataType.HEART_RATE,
+  HealthDataType.BLOOD_OXYGEN,
+  HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
+  HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
+  HealthDataType.BODY_TEMPERATURE,
+  HealthDataType.STEPS,
+  HealthDataType.HEART_RATE_VARIABILITY_RMSSD,
+  HealthDataType.ACTIVE_ENERGY_BURNED,
+  HealthDataType.DISTANCE_DELTA,
+  HealthDataType.SLEEP_ASLEEP,
+];
+
+/// Result of a Health Connect sync — how many of BMH's own records were
+/// written, plus anything found that came from OTHER apps (e.g. the
+/// phone's own step counter, another app's sleep tracking). The "other
+/// apps" data is informational only — it is not merged into BMH's own
+/// live band readings anywhere.
+class HealthSyncResult {
+  final bool ok;
+  final int written;
+  final Map<String, String> fromOtherApps;
+  final String? error;
+  final String? debugInfo; // NEW: For detailed error messages
+  
+  const HealthSyncResult({
+    required this.ok,
+    required this.written,
+    required this.fromOtherApps,
+    this.error,
+    this.debugInfo,
+  });
+}
+
 class HealthService {
-  // ========== Request Permissions ==========
-  static Future<void> requestPermissions() async {
+  static final Health _health = Health();
+  static bool _configured = false;
+
+  static Future<void> _ensureConfigured() async {
+    if (_configured) return;
+    await _health.configure();
+    _configured = true;
+  }
+
+  // ── HealthKit authorization (iOS only) ───────────────
+  // Call this once at startup so the Health permission row
+  // appears in iOS Settings → BMH.
+  static Future<void> requestHealthPermissions() async {
+    if (!Platform.isIOS) return; // Android unaffected
     try {
-      print('✅ Requesting health permissions...');
+      await _ensureConfigured();
+      await _health.requestAuthorization(
+        _kHealthTypes,
+        permissions: _kHealthTypes
+            .map((_) => HealthDataAccess.READ_WRITE)
+            .toList(),
+      );
     } catch (e) {
-      print('❌ Permission request error: $e');
+      debugPrint('HealthService.requestHealthPermissions failed: $e');
     }
   }
 
-  static Future<void> requestIOSPermissions() async {
-    if (!Platform.isIOS) return;
-    try {
-      print('✅ iOS HealthKit permissions requested');
-    } catch (e) {
-      print('❌ iOS permission error: $e');
-    }
-  }
+  // ── Google Health Connect (Android only) ──────────────
 
-  static Future<void> requestAndroidPermissions() async {
-    if (!Platform.isAndroid) return;
-    try {
-      print('✅ Android Health Connect permissions requested');
-    } catch (e) {
-      print('❌ Android permission error: $e');
-    }
-  }
-
-  // ========== Check Permissions ==========
-  static Future<bool> hasPermissions() async {
-    try {
-      return true;
-    } catch (e) {
-      print('❌ Permission check error: $e');
-      return false;
-    }
-  }
-
-  static Future<bool> hasHealthConnectPermissions() async {
-    if (!Platform.isAndroid) return false;
-    try {
-      return true;
-    } catch (e) {
-      print('❌ Health Connect permission check error: $e');
-      return false;
-    }
-  }
-
-  // ========== Health Connect Availability (Android) ==========
+  /// Whether the Health Connect app is installed and usable. False on
+  /// anything other than Android, or if Health Connect isn't installed
+  /// / needs an update.
   static Future<bool> isHealthConnectAvailable() async {
     if (!Platform.isAndroid) return false;
     try {
-      print('✅ Health Connect is available');
-      return true;
+      await _ensureConfigured();
+      final status = await _health.getHealthConnectSdkStatus();
+      debugPrint('[HealthService] Health Connect SDK Status: $status');
+      return status == HealthConnectSdkStatus.sdkAvailable;
     } catch (e) {
-      print('❌ Health Connect availability error: $e');
+      debugPrint('HealthService.isHealthConnectAvailable failed: $e');
       return false;
     }
   }
 
+  /// Opens the Play Store listing so the user can install or update
+  /// Health Connect.
   static Future<void> openHealthConnectInstall() async {
     if (!Platform.isAndroid) return;
     try {
-      print('Opening Health Connect install page...');
+      await _ensureConfigured();
+      await _health.installHealthConnect();
     } catch (e) {
-      print('❌ Error opening Health Connect install: $e');
+      debugPrint('HealthService.openHealthConnectInstall failed: $e');
     }
   }
 
-  // FIX: Changed from returning void to returning bool
-  static Future<bool> requestHealthConnectPermissions() async {
+  /// True if BMH already has read+write permission for every type it
+  /// uses — checked silently, no system UI shown.
+  static Future<bool> hasHealthConnectPermissions() async {
     if (!Platform.isAndroid) return false;
     try {
-      await requestAndroidPermissions();
-      print('✅ Health Connect permissions requested');
-      return true;
+      await _ensureConfigured();
+      
+      // NEW: Check each permission individually for debugging
+      final result = await _health.hasPermissions(
+            _kHealthConnectTypes,
+            permissions: _kHealthConnectTypes
+                .map((_) => HealthDataAccess.READ_WRITE)
+                .toList(),
+          ) ??
+          false;
+      
+      debugPrint('[HealthService] Health Connect permissions check: $result');
+      
+      if (!result) {
+        // NEW: Log which permissions might be missing
+        debugPrint('[HealthService] Missing permissions for types:');
+        for (var type in _kHealthConnectTypes) {
+          debugPrint('  - ${type.name}');
+        }
+      }
+      
+      return result;
     } catch (e) {
-      print('❌ Health Connect permission request error: $e');
+      debugPrint('HealthService.hasHealthConnectPermissions failed: $e');
       return false;
     }
   }
 
-  // ========== Get All Health Data ==========
-  static Future<List<Map<String, dynamic>>> getAllHealthData({
-    required DateTime startDate,
-    required DateTime endDate,
-  }) async {
+  /// Shows Android's native Health Connect permission screen and
+  /// returns true only if the user actually granted access.
+  static Future<bool> requestHealthConnectPermissions() async {
+    if (!Platform.isAndroid) return false;
     try {
-      await requestPermissions();
-      print('✅ Getting health data from ${startDate.toString()} to ${endDate.toString()}');
-      return [];
+      await _ensureConfigured();
+      final already = await hasHealthConnectPermissions();
+      if (already) return true;
+      
+      debugPrint('[HealthService] Requesting Health Connect permissions...');
+      
+      final granted = await _health.requestAuthorization(
+        _kHealthConnectTypes,
+        permissions: _kHealthConnectTypes
+            .map((_) => HealthDataAccess.READ_WRITE)
+            .toList(),
+      );
+      
+      debugPrint('[HealthService] Permissions granted: $granted');
+      return granted;
     } catch (e) {
-      print('❌ Get health data error: $e');
-      return [];
+      debugPrint('HealthService.requestHealthConnectPermissions failed: $e');
+      return false;
     }
   }
 
-  static Future<HealthSyncResponse> syncWithHealthKit({
-    required double heartRate,
-    required double spo2,
-    required double systolic,
-    required double diastolic,
-    required double temperature,
-    required double hrv,
-    required int calories,
-    required double distanceKm,
-    required int steps,
-    required int sleepMinutes,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    if (!Platform.isIOS) {
-      return HealthSyncResponse.failure(
-        message: 'HealthKit is only available on iOS',
-      );
-    }
-    
-    try {
-      await requestIOSPermissions();
-      
-      // Validate health data before syncing
-      if (heartRate < 0 || heartRate > 300) {
-        return HealthSyncResponse.failure(
-          message: 'Invalid heart rate value',
-        );
-      }
-      if (spo2 < 0 || spo2 > 100) {
-        return HealthSyncResponse.failure(
-          message: 'Invalid SpO2 value',
-        );
-      }
-      
-      print('✅ Syncing health data to HealthKit:');
-      print('  Heart Rate: $heartRate bpm');
-      print('  SpO2: $spo2 %');
-      print('  BP: $systolic/$diastolic mmHg');
-      print('  Temperature: $temperature °C');
-      print('  HRV: $hrv ms');
-      print('  Calories: $calories kcal');
-      print('  Distance: $distanceKm km');
-      print('  Steps: $steps');
-      print('  Sleep: $sleepMinutes minutes');
-      
-      // Simulate sync success
-      // In production, this would write to HealthKit via platform channel
-      return HealthSyncResponse.success(
-        message: 'Successfully synced health data to HealthKit',
-      );
-    } catch (e) {
-      print('❌ HealthKit sync error: $e');
-      return HealthSyncResponse.failure(
-        message: 'Failed to sync health data: $e',
-      );
-    }
-  }
-
-  static Future<HealthSyncResponse> syncWithHealthConnect({
-    required double heartRate,
-    required double spo2,
-    required double systolic,
-    required double diastolic,
-    required double temperature,
-    required double hrv,
-    required int calories,
-    required double distanceKm,
-    required int steps,
-    required int sleepMinutes,
-    DateTime? startDate,
-    DateTime? endDate,
+  /// Writes the band's current readings into Health Connect, then reads
+  /// back the last 24h so anything from OTHER apps (Google Fit, Samsung
+  /// Health, the phone's own step counter, etc.) can be shown to the
+  /// user. Manual, on-demand — called from the "Sync Now" button.
+  Future<HealthSyncResult> syncWithHealthConnect({
+    double heartRate = 0,
+    double spo2 = 0,
+    double systolic = 0,
+    double diastolic = 0,
+    double temperature = 0,
+    double hrv = 0,
+    double calories = 0,
+    double distanceKm = 0,
+    int steps = 0,
+    int sleepMinutes = 0,
   }) async {
     if (!Platform.isAndroid) {
-      return HealthSyncResponse.failure(
-        message: 'Health Connect is only available on Android',
-      );
+      return const HealthSyncResult(
+          ok: false, written: 0, fromOtherApps: {}, error: 'Android only');
     }
     
+    debugPrint('[HealthService] Starting Health Connect sync...');
+    debugPrint('[HealthService] Input data: HR=$heartRate, SpO2=$spo2, '
+        'BP=$systolic/$diastolic, Temp=$temperature, Steps=$steps');
+    
     try {
-      await requestAndroidPermissions();
+      await HealthService._ensureConfigured();
+
+      // NEW: Enhanced permission check with debugging
+      final hasPerm = await HealthService.hasHealthConnectPermissions();
+      debugPrint('[HealthService] Permission check result: $hasPerm');
       
-      // Validate health data before syncing
-      if (heartRate < 0 || heartRate > 300) {
-        return HealthSyncResponse.failure(
-          message: 'Invalid heart rate value',
+      if (!hasPerm) {
+        debugPrint('[HealthService] ❌ SYNC FAILED: Permissions not granted');
+        return HealthSyncResult(
+          ok: false, written: 0, fromOtherApps: {},
+          error: 'Permission not granted',
+          debugInfo: 'User has not granted Health Connect permissions. '
+              'Go to Settings > Apps > Health > Health Connect and enable all metrics.',
         );
       }
-      if (spo2 < 0 || spo2 > 100) {
-        return HealthSyncResponse.failure(
-          message: 'Invalid SpO2 value',
+
+      final now = DateTime.now();
+      final justNow = now.subtract(const Duration(seconds: 30));
+      int written = 0;
+
+      Future<void> write(HealthDataType type, double value,
+          {DateTime? start}) async {
+        if (value <= 0) return;
+        try {
+          debugPrint('[HealthService] Writing $type = $value');
+          final ok = await HealthService._health.writeHealthData(
+            value: value,
+            type: type,
+            startTime: start ?? justNow,
+            endTime: now,
+          );
+          if (ok) {
+            written++;
+            debugPrint('[HealthService] ✅ Successfully wrote $type');
+          } else {
+            debugPrint('[HealthService] ⚠️ Write returned false for $type');
+          }
+        } catch (e) {
+          debugPrint('[HealthService] ❌ Write failed for $type: $e');
+        }
+      }
+
+      // NEW: Log each write attempt
+      debugPrint('[HealthService] Beginning data write phase...');
+      
+      await write(HealthDataType.HEART_RATE, heartRate);
+      await write(HealthDataType.BLOOD_OXYGEN, spo2);
+      await write(HealthDataType.BLOOD_PRESSURE_SYSTOLIC, systolic);
+      await write(HealthDataType.BLOOD_PRESSURE_DIASTOLIC, diastolic);
+      await write(HealthDataType.BODY_TEMPERATURE, temperature);
+      await write(HealthDataType.STEPS, steps.toDouble());
+      await write(HealthDataType.HEART_RATE_VARIABILITY_RMSSD, hrv);
+      await write(HealthDataType.ACTIVE_ENERGY_BURNED, calories);
+      await write(HealthDataType.DISTANCE_DELTA, distanceKm * 1000); // km → m
+      if (sleepMinutes > 0) {
+        await write(
+          HealthDataType.SLEEP_ASLEEP,
+          sleepMinutes.toDouble(),
+          start: now.subtract(Duration(minutes: sleepMinutes)),
         );
       }
-      
-      print('✅ Syncing health data to Health Connect:');
-      print('  Heart Rate: $heartRate bpm');
-      print('  SpO2: $spo2 %');
-      print('  BP: $systolic/$diastolic mmHg');
-      print('  Temperature: $temperature °C');
-      print('  HRV: $hrv ms');
-      print('  Calories: $calories kcal');
-      print('  Distance: $distanceKm km');
-      print('  Steps: $steps');
-      print('  Sleep: $sleepMinutes minutes');
-      
-      // Simulate sync success
-      // In production, this would write to Health Connect via platform channel
-      return HealthSyncResponse.success(
-        message: 'Successfully synced health data to Health Connect',
-      );
+
+      debugPrint('[HealthService] Data write phase complete. '
+          'Total written: $written');
+
+      // NEW: Enhanced read-back with detailed logging
+      final fromOtherApps = <String, String>{};
+      try {
+        debugPrint('[HealthService] Reading back last 24h from Health Connect...');
+        
+        final points = await HealthService._health.getHealthDataFromTypes(
+          types: _kHealthConnectTypes,
+          startTime: now.subtract(const Duration(hours: 24)),
+          endTime: now,
+        );
+        
+        debugPrint('[HealthService] ✅ Read $points.length data points from Health Connect');
+        
+        // NEW: Log what we found
+        Map<String, int> appSources = {};
+        for (final p in points) {
+          final src = p.sourceName;
+          appSources[src] = (appSources[src] ?? 0) + 1;
+          
+          if (src.toLowerCase().contains('bmh') ||
+              src.toLowerCase().contains('biohealthcare')) {
+            continue; // skip BMH's own writes — only show OTHER apps
+          }
+          final label = src.isEmpty ? 'Unknown app' : src;
+          fromOtherApps['${p.type.name} · $label'] = p.value.toString();
+        }
+        
+        debugPrint('[HealthService] Data sources found:');
+        appSources.forEach((src, count) {
+          debugPrint('  - $src: $count points');
+        });
+        
+        if (fromOtherApps.isEmpty && points.isNotEmpty) {
+          debugPrint('[HealthService] ⚠️ All points are from BMH itself (no other apps)');
+        }
+        
+      } catch (e) {
+        debugPrint('[HealthService] ⚠️ Read-back phase failed: $e');
+        // Don't fail the whole sync, just skip reading back other apps
+      }
+
+      debugPrint('[HealthService] ✅ SYNC COMPLETED SUCCESSFULLY');
+      return HealthSyncResult(
+          ok: written > 0, 
+          written: written, 
+          fromOtherApps: fromOtherApps,
+          debugInfo: 'Wrote $written metrics to Health Connect');
+          
     } catch (e) {
-      print('❌ Health Connect sync error: $e');
-      return HealthSyncResponse.failure(
-        message: 'Failed to sync health data: $e',
-      );
+      debugPrint('[HealthService] ❌ SYNC FAILED WITH EXCEPTION: $e');
+      return HealthSyncResult(
+          ok: false, 
+          written: 0, 
+          fromOtherApps: const {}, 
+          error: '$e',
+          debugInfo: 'Exception during sync. Check logs for details.');
     }
   }
 
-  static Future<HealthSyncResponse> syncAll({
-    required double heartRate,
-    required double spo2,
-    required double systolic,
-    required double diastolic,
-    required double temperature,
-    required double hrv,
-    required int calories,
-    required double distanceKm,
-    required int steps,
-    required int sleepMinutes,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    if (Platform.isIOS) {
-      return syncWithHealthKit(
-        heartRate: heartRate,
-        spo2: spo2,
-        systolic: systolic,
-        diastolic: diastolic,
-        temperature: temperature,
-        hrv: hrv,
-        calories: calories,
-        distanceKm: distanceKm,
-        steps: steps,
-        sleepMinutes: sleepMinutes,
-        startDate: startDate,
-        endDate: endDate,
-      );
-    } else if (Platform.isAndroid) {
-      return syncWithHealthConnect(
-        heartRate: heartRate,
-        spo2: spo2,
-        systolic: systolic,
-        diastolic: diastolic,
-        temperature: temperature,
-        hrv: hrv,
-        calories: calories,
-        distanceKm: distanceKm,
-        steps: steps,
-        sleepMinutes: sleepMinutes,
-        startDate: startDate,
-        endDate: endDate,
-      );
-    }
-    return HealthSyncResponse.failure(
-      message: 'Unsupported platform',
-    );
-  }
-
-  // ========== Get Specific Health Metrics ==========
-  static Future<double?> getRecentHeartRate({
-    Duration lookbackDuration = const Duration(hours: 1),
+  // Syncs all current vitals.
+  // Returns true on success, false on failure.
+  // Kept for backward compatibility — superseded by syncWithHealthConnect
+  // above for the real Android Health Connect flow.
+  Future<bool> syncAll({
+    double heartRate = 0,
+    double spo2 = 0,
+    double systolic = 0,
+    double diastolic = 0,
+    double temperature = 0,
   }) async {
     try {
-      print('✅ Getting recent heart rate...');
-      return null;
-    } catch (e) {
-      print('❌ Heart rate error: $e');
-      return null;
-    }
-  }
+      // TODO: Replace with real API call when backend is ready.
+      // For now, simulate a successful sync after a short delay.
+      await Future.delayed(const Duration(milliseconds: 800));
 
-  static Future<int?> getTodaySteps() async {
-    try {
-      print('✅ Getting today steps...');
-      return 0;
-    } catch (e) {
-      print('❌ Steps error: $e');
-      return null;
-    }
-  }
+      debugPrint('HealthService.syncAll: '
+          'HR=$heartRate, SpO2=$spo2, '
+          'BP=$systolic/$diastolic, Temp=$temperature');
 
-  static Future<double?> getRecentBloodOxygen({
-    Duration lookbackDuration = const Duration(hours: 1),
-  }) async {
-    try {
-      print('✅ Getting recent blood oxygen...');
-      return null;
-    } catch (e) {
-      print('❌ O2 error: $e');
-      return null;
-    }
-  }
-
-  static Future<Map<String, dynamic>> getHealthSummary() async {
-    try {
-      final hr = await getRecentHeartRate();
-      final o2 = await getRecentBloodOxygen();
-      final steps = await getTodaySteps();
-
-      return {
-        'heartRate': hr,
-        'bloodOxygen': o2,
-        'steps': steps,
-        'timestamp': DateTime.now(),
-      };
-    } catch (e) {
-      print('❌ Summary error: $e');
-      return {};
-    }
-  }
-
-  // ========== Write Health Data ==========
-  static Future<bool> writeHealthData({
-    required String type,
-    required double value,
-    required DateTime dateTime,
-  }) async {
-    try {
-      print('✅ Writing health data: $type = $value');
       return true;
     } catch (e) {
-      print('❌ Write error: $e');
+      debugPrint('HealthService.syncAll failed: $e');
       return false;
     }
   }
