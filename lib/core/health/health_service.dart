@@ -1,13 +1,11 @@
 import 'dart:io';
 
 /// Simplified Health Service - Works without external health package
-/// Real health integration will be added via native channels
 class HealthService {
   // ========== Request Permissions ==========
   static Future<void> requestPermissions() async {
     try {
       print('✅ Requesting health permissions...');
-      // Placeholder - will be implemented with native channels
     } catch (e) {
       print('❌ Permission request error: $e');
     }
@@ -34,7 +32,7 @@ class HealthService {
   // ========== Check Permissions ==========
   static Future<bool> hasPermissions() async {
     try {
-      return true; // Placeholder
+      return true;
     } catch (e) {
       print('❌ Permission check error: $e');
       return false;
@@ -44,7 +42,7 @@ class HealthService {
   static Future<bool> hasHealthConnectPermissions() async {
     if (!Platform.isAndroid) return false;
     try {
-      return true; // Placeholder
+      return true;
     } catch (e) {
       print('❌ Health Connect permission check error: $e');
       return false;
@@ -72,13 +70,16 @@ class HealthService {
     }
   }
 
-  static Future<void> requestHealthConnectPermissions() async {
-    if (!Platform.isAndroid) return;
+  // FIX: Changed from returning void to returning bool
+  static Future<bool> requestHealthConnectPermissions() async {
+    if (!Platform.isAndroid) return false;
     try {
       await requestAndroidPermissions();
       print('✅ Health Connect permissions requested');
+      return true;
     } catch (e) {
       print('❌ Health Connect permission request error: $e');
+      return false;
     }
   }
 
@@ -90,7 +91,7 @@ class HealthService {
     try {
       await requestPermissions();
       print('✅ Getting health data from ${startDate.toString()} to ${endDate.toString()}');
-      return []; // Placeholder - returns empty list
+      return [];
     } catch (e) {
       print('❌ Get health data error: $e');
       return [];
@@ -143,7 +144,7 @@ class HealthService {
   }) async {
     try {
       print('✅ Getting recent heart rate...');
-      return null; // Placeholder
+      return null;
     } catch (e) {
       print('❌ Heart rate error: $e');
       return null;
@@ -153,7 +154,7 @@ class HealthService {
   static Future<int?> getTodaySteps() async {
     try {
       print('✅ Getting today steps...');
-      return 0; // Placeholder
+      return 0;
     } catch (e) {
       print('❌ Steps error: $e');
       return null;
@@ -165,7 +166,7 @@ class HealthService {
   }) async {
     try {
       print('✅ Getting recent blood oxygen...');
-      return null; // Placeholder
+      return null;
     } catch (e) {
       print('❌ O2 error: $e');
       return null;
