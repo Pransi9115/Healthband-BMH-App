@@ -6,13 +6,13 @@ plugins {
 
 android {
     namespace = "com.example.bmh_app"
-    compileSdk = 34
+    compileSdk = 35
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "com.example.bmh_app"
-        minSdk = flutter.minSdkVersion
-        targetSdk = 34
+        minSdk = 21
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
     }
