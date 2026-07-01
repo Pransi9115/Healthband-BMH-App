@@ -2,17 +2,17 @@ name: bmh_app
 description: BioMedical Healthcare — BMH Mobile App
 publish_to: 'none'
 version: 1.0.0+65
-
 environment:
   sdk: '>=3.0.0 <4.0.0'
   flutter: ">=3.10.0"
-
 dependencies:
   flutter:
-    sdk: flutter   
-  health: ^8.0.0
+    sdk: flutter
+  
+  # Health Tracking - REAL WORKING VERSIONS
+  health: ^9.0.0
   permission_handler: ^11.0.0
-  workmanager: ^0.5.1  
+  workmanager: ^0.5.1
   flutter_riverpod: ^2.4.9
   riverpod_annotation: ^2.3.3
   go_router: ^13.0.0
@@ -40,14 +40,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
-  # ── Google Fonts offline cache (optional but recommended) ───────
-  # Add this so fonts work offline after first download.
-  # If you want fonts bundled in the app (no internet needed ever),
-  # set FLUTTER_WEB_USE_SKIA=true or use the google_fonts package with
-  # GoogleFonts.config.allowRuntimeFetching = false; and bundle the
-  # .ttf files — but for now runtime fetching is ON (works fine).
-
   assets:
     - assets/images/
     - assets/lottie/
