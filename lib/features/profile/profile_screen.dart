@@ -555,7 +555,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   setState(() => _healthSyncing = true);
 
-  final result = await HealthService().syncWithHealthConnect(
+  final result = await HealthService.syncWithHealthConnect(
     heartRate: _ble.heartRate.toDouble(),
     spo2: _ble.spo2.toDouble(),
     systolic: _ble.bpSystolic.toDouble(),
