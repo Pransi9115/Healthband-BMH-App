@@ -4,5 +4,3 @@ import UIKit
 class SceneDelegate: FlutterSceneDelegate {
 
 }
-
-
