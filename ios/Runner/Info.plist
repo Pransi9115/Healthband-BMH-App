@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+<key>NSHealthShareUsageDescription</key>
+	<string>BMH App reads your health data such as heart rate, steps, and sleep from your health band to display your health insights and trends.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>BMH App saves health measurements collected from your health band, such as heart rate and activity data, to Apple Health.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>BMH App uses Bluetooth to connect to your health band device to sync your health measurements.</string>
 </dict>
 </plist>
