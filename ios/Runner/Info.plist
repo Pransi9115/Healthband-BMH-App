@@ -72,5 +72,15 @@
 	<string>BMH App saves health measurements collected from your health band, such as heart rate and activity data, to Apple Health.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>BMH App uses Bluetooth to connect to your health band device to sync your health measurements.</string>
+<key>NSLocationWhenInUseUsageDescription</key>
+	<string>BMH App needs your location to scan for and connect to nearby Bluetooth health band devices.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>BMH App uses your location in the background to stay connected to your health band and sync data continuously.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>BMH App uses the camera to scan QR codes for pairing your health band device.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+	</array>
 </dict>
 </plist>
