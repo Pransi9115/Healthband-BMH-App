@@ -54,6 +54,16 @@ class VitalHistoryService extends ChangeNotifier {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
 
+    // ── ONE-TIME MIGRATION ─────────────────────────────
+    // The old 0x53 parser read the record header/date bytes as
+    // "total sleep minutes", producing a constant bogus value
+    // (e.g. 8.5h) that was persisted here. Purge all sleep
+    // readings once so only correctly-parsed data is kept.
+    if (!(prefs.getBool('sleep_parser_v2') ?? false)) {
+      await prefs.remove('${_prefix}sleep');
+      await prefs.setBool('sleep_parser_v2', true);
+    }
+
     // Load first-wear date
     final fw = prefs.getInt(_firstWearKey);
     if (fw != null) {
@@ -175,8 +185,8 @@ class VitalHistoryService extends ChangeNotifier {
     final now = DateTime.now();
 
     switch (range) {
-      case 0: // Daily — hourly averages for today
-        return _aggregateHourly(readings, now);
+      case 0: // Daily — 30-minute averages for today (x = half-hour index 0–47)
+        return _aggregateHalfHourly(readings, now);
       case 1: // Weekly — daily averages for last 7 days
         return _aggregateDaily(readings, now, 7);
       case 2: // Monthly — weekly averages for last 30 days
@@ -186,8 +196,9 @@ class VitalHistoryService extends ChangeNotifier {
     }
   }
 
-  // Daily: group by hour (0–23), return hours that have data
-  List<FlSpot> _aggregateHourly(List<VitalReading> readings, DateTime now) {
+  // Daily: group by 30-minute slot (0–47), return slots that have data.
+  // x = halfHourIndex → 20 = 10:00am, 21 = 10:30am, etc.
+  List<FlSpot> _aggregateHalfHourly(List<VitalReading> readings, DateTime now) {
     final today = DateTime(now.year, now.month, now.day);
     final todayReadings =
         readings.where((r) => r.timestamp.isAfter(today)).toList();
@@ -196,8 +207,8 @@ class VitalHistoryService extends ChangeNotifier {
 
     final Map<int, List<double>> buckets = {};
     for (final r in todayReadings) {
-      final h = r.timestamp.hour;
-      buckets.putIfAbsent(h, () => []).add(r.value);
+      final slot = r.timestamp.hour * 2 + (r.timestamp.minute >= 30 ? 1 : 0);
+      buckets.putIfAbsent(slot, () => []).add(r.value);
     }
 
     final spots = buckets.entries
@@ -207,6 +218,16 @@ class VitalHistoryService extends ChangeNotifier {
       ..sort((a, b) => a.x.compareTo(b.x));
 
     return spots;
+  }
+
+  // Formats a half-hour slot index (0–47) → '10am', '10:30am', '12pm'…
+  static String halfHourLabel(int slot) {
+    final h = slot ~/ 2;
+    final half = slot.isOdd;
+    final ampm = h < 12 ? 'am' : 'pm';
+    int h12 = h % 12;
+    if (h12 == 0) h12 = 12;
+    return half ? '$h12:30$ampm' : '$h12$ampm';
   }
 
   // Weekly: one point per day for last 7 days — ALWAYS 7 spots (null = no data)
@@ -274,10 +295,10 @@ class VitalHistoryService extends ChangeNotifier {
   List<String> getLabels(String key, int range) {
     final now = DateTime.now();
     switch (range) {
-      case 0: // Daily — show hours that have data
+      case 0: // Daily — show 30-min slots that have data (10am, 10:30am…)
         final spots = getSpots(key, 0);
         if (spots.isEmpty) return _defaultHourLabels();
-        return spots.map((s) => _hourLabel(s.x.toInt())).toList();
+        return spots.map((s) => halfHourLabel(s.x.toInt())).toList();
       case 1: // Weekly — Mon–Sun relative to today
         return _last7DayLabels(now);
       case 2: // Monthly — W1–W4

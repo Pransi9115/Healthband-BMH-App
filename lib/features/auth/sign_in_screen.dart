@@ -3,6 +3,7 @@ import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_screen.dart';
 import '../home/main_shell.dart';
+import '../../core/auth/auth_service.dart';
 import 'sign_up_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -27,7 +28,19 @@ class _SignInScreenState extends State<SignInScreen> {
 
   Future<void> _signIn() async {
     setState(() => _loading = true);
+
+    // TODO(api): replace with your real login call — on success,
+    // pass the server's access/refresh tokens + expires_in below.
     await Future.delayed(const Duration(milliseconds: 1400));
+
+    // Persist the session (iOS Keychain / Android Keystore).
+    // Survives app closes, device restarts and app updates —
+    // Login screen will not appear again until logout.
+    await AuthService.instance.saveSession(
+      accessToken: 'local-session-${DateTime.now().millisecondsSinceEpoch}',
+      email: _emailCtrl.text.trim(),
+    );
+
     if (!mounted) return;
     setState(() => _loading = false);
     Navigator.pushAndRemoveUntil(

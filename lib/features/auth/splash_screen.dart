@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
+import '../../core/auth/auth_service.dart';
+import '../../core/ble/ble_service.dart';
+import '../home/main_shell.dart';
 import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -45,15 +48,29 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _animate() async {
+    // Validate the stored session while the logo animates —
+    // no extra wait is added to the splash.
+    final sessionCheck = AuthService.instance.hasValidSession();
+
     await Future.delayed(const Duration(milliseconds: 300));
     await _logoCtrl.forward();
     await Future.delayed(const Duration(milliseconds: 200));
     await _textCtrl.forward();
     await Future.delayed(const Duration(milliseconds: 900));
+
+    final loggedIn = await sessionCheck;
     if (!mounted) return;
+
+    if (loggedIn) {
+      // Returning user → straight to Home, no Login screen.
+      // Also silently reconnect the previously paired band.
+      BleService.instance.tryAutoReconnect();
+    }
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const WelcomeScreen(),
+        pageBuilder: (_, __, ___) =>
+            loggedIn ? const MainShell() : const WelcomeScreen(),
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 500),
@@ -94,22 +111,30 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── LOGO MARK ───────────────────────────
+                // ── LOGO ────────────────────────────────
+                // Uses the official Bio Health Care lockup from
+                // assets. Falls back to the original scan-line
+                // mark if the asset is not bundled yet.
                 FadeTransition(
                   opacity: _logoFade,
                   child: ScaleTransition(
                     scale: _logoScale,
-                    child: Container(
-                      width: 88, height: 88,
-                      decoration: BoxDecoration(
-                        color: BMHColors.bg1,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: BMHColors.lineBright),
-                        boxShadow: BMHShadows.cyan,
-                      ),
-                      child: const Center(
-                        child: BMHScanLineFigure(
-                          width: 42, height: 64, opacity: 0.8,
+                    child: Image.asset(
+                      'assets/images/bio_health_care_logo.png',
+                      width: 300,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 88, height: 88,
+                        decoration: BoxDecoration(
+                          color: BMHColors.bg1,
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: BMHColors.lineBright),
+                          boxShadow: BMHShadows.cyan,
+                        ),
+                        child: const Center(
+                          child: BMHScanLineFigure(
+                            width: 42, height: 64, opacity: 0.8,
+                          ),
                         ),
                       ),
                     ),
@@ -118,34 +143,13 @@ class _SplashScreenState extends State<SplashScreen>
 
                 const SizedBox(height: 28),
 
-                // ── BRAND TEXT ──────────────────────────
+                // ── TAGLINE ─────────────────────────────
                 FadeTransition(
                   opacity: _textFade,
                   child: SlideTransition(
                     position: _textSlide,
                     child: Column(
                       children: [
-                        // BIO MEDICAL eyebrow
-                        Text(
-                          'BIO MEDICAL',
-                          style: BMHText.eyebrow.copyWith(
-                            fontSize: 11,
-                            letterSpacing: 0.42 * 11,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        // HEALTHCARE wordmark
-                        Text(
-                          'HEALTHCARE',
-                          style: BMHText.labelLg.copyWith(
-                            fontFamily: 'Plus Jakarta Sans',
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.14 * 26,
-                            color: BMHColors.ink,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
                         // Tagline
                         Text(
                           'THE FUTURE DOESN\'T HAVE TO BE UNPREDICTABLE',

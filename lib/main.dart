@@ -70,8 +70,34 @@ Future<void> _requestiOSPermissions() async {
   await Permission.notification.request();
 }
 
-class BMHApp extends StatelessWidget {
+class BMHApp extends StatefulWidget {
   const BMHApp({super.key});
+  @override
+  State<BMHApp> createState() => _BMHAppState();
+}
+
+class _BMHAppState extends State<BMHApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Timers freeze while backgrounded — the moment the app is
+    // visible again, re-establish the band link if it dropped.
+    if (state == AppLifecycleState.resumed) {
+      BleService.instance.onAppResumed();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(

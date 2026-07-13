@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../health/vital_history_service.dart';
 
 // ─────────────────────────────────────────────────────────
@@ -226,6 +227,75 @@ class BleService extends ChangeNotifier {
   //  isReconnecting stays true throughout so the UI can show a
   //  distinct "reconnecting" state instead of looking fully dead.
   // ─────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────
+  //  DEVICE PERSISTENCE + LAUNCH AUTO-RECONNECT
+  //  Once paired, the band reconnects on every app launch
+  //  and app-resume with zero user action — until the user
+  //  explicitly forgets the device.
+  // ─────────────────────────────────────────────────────
+  static const _kDevId   = 'bmh_last_device_id';
+  static const _kDevName = 'bmh_last_device_name';
+  static const _kAutoRc  = 'bmh_auto_reconnect';
+
+  Future<void> _saveLastDevice(BMHBleDevice dev) async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setString(_kDevId, dev.device.remoteId.str);
+      await p.setString(_kDevName, dev.name);
+      await p.setBool(_kAutoRc, true);
+    } catch (_) {}
+  }
+
+  /// Forget the paired band completely — stops all auto-reconnect
+  /// until the user pairs again from the scan screen.
+  Future<void> forgetSavedDevice() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.remove(_kDevId);
+      await p.remove(_kDevName);
+      await p.setBool(_kAutoRc, false);
+    } catch (_) {}
+  }
+
+  /// Call once on app launch (after splash) and on app resume.
+  /// Silently reconnects to the previously paired band.
+  Future<void> tryAutoReconnect() async {
+    if (isBandConnected || _isConnecting) return;
+    try {
+      final p = await SharedPreferences.getInstance();
+      if (!(p.getBool(_kAutoRc) ?? false)) return;
+      final id = p.getString(_kDevId);
+      if (id == null || id.isEmpty) return;
+      final name = p.getString(_kDevName) ?? 'Health Band';
+
+      // Wait (briefly) for the adapter to power on
+      final state = await FlutterBluePlus.adapterState
+          .firstWhere((s) => s == BluetoothAdapterState.on)
+          .timeout(const Duration(seconds: 8),
+              onTimeout: () => BluetoothAdapterState.off);
+      if (state != BluetoothAdapterState.on) return;
+
+      final dev = BMHBleDevice(
+        id: id, name: name, rssi: -60,
+        type: BMHDeviceType.healthBand,
+        device: BluetoothDevice.fromId(id),
+      );
+      _manualDisconnect = false;
+      final ok = await connectDevice(dev);
+      if (!ok) _scheduleReconnect(); // keep trying in background
+    } catch (_) {}
+  }
+
+  /// App came back to foreground — timers may have been frozen
+  /// while backgrounded; reconnect immediately if the link dropped.
+  void onAppResumed() {
+    if (!isBandConnected && !_isConnecting && !_manualDisconnect) {
+      _reconnectTimer?.cancel();
+      _reconnectCount = 0;
+      tryAutoReconnect();
+    }
+  }
+
   void _scheduleReconnect() {
     if (_manualDisconnect || _lastBandDev == null) {
       _isReconnecting = false;
@@ -351,8 +421,11 @@ class BleService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Save for auto-reconnect
-      if (dev.type != BMHDeviceType.bioScale) _lastBandDev = dev;
+      // Save for auto-reconnect (in-memory + persisted across restarts)
+      if (dev.type != BMHDeviceType.bioScale) {
+        _lastBandDev = dev;
+        _saveLastDevice(dev);
+      }
 
       await dev.device.connect(
         timeout: const Duration(seconds: 15),
@@ -587,13 +660,16 @@ class BleService extends ChangeNotifier {
   void _startKeepAlive() {
   _keepAliveTimer?.cancel();
   _keepAliveTimer = Timer.periodic(
-    const Duration(seconds: 4), (_) async {
+    const Duration(seconds: 5), (_) async {
     if (!isBandConnected || _writeChar == null) return;
 
-    // existing — keep real-time step+HR+temp stream alive
-    await _write(_cmd([_REAL_STEP, 0x01, 0x01]));
-    // Send twice — band sometimes needs a second ping to resume stream
-    await _delay(200);
+    // Only ping when the real-time stream has actually gone quiet.
+    // Flooding the band with 0x09 every few seconds while data is
+    // already flowing congests its command buffer and is a known
+    // cause of spontaneous disconnects on JStyle firmware.
+    final silentFor = DateTime.now().difference(_lastDataTime);
+    if (silentFor < const Duration(seconds: 6)) return;
+
     await _write(_cmd([_REAL_STEP, 0x01, 0x01]));
     // NOTE: _TOTAL_DATA removed — causes step count flickering
   });
@@ -1004,33 +1080,58 @@ class BleService extends ChangeNotifier {
             }
           }
           break;
-        case 0x53: // Sleep data from band
-          // SDK: getSleepData response
-          // d[1..2] = total sleep minutes
-          // d[3..4] = deep sleep minutes  
-          // d[5..6] = light sleep minutes
-          // d[7]    = REM count (x10 = minutes)
-          // d[8]    = awake count (x5 = minutes)
-          if (d.length >= 6) {
-            final total = ((d[1] & 0xff) << 8) | (d[2] & 0xff);
-            final deep  = ((d[3] & 0xff) << 8) | (d[4] & 0xff);
-            final light = ((d[5] & 0xff) << 8) | (d[6] & 0xff);
-            // Valid sleep: 30 min to 12 hours
-            if (total >= 30 && total <= 720) {
-              final rem   = d.length > 7 ? (d[7] & 0xff) * 10 : 0;
-              final awake = d.length > 8 ? (d[8] & 0xff) * 5  : 0;
-              _lastSleep = BMHSleepData(
-                totalMinutes: total,
-                deepMinutes:  deep.clamp(0, total),
-                lightMinutes: light.clamp(0, total),
-                remMinutes:   rem.clamp(0, total),
-                awakeMinutes: awake.clamp(0, total),
-                quality: _sleepQ(total),
-                date: DateTime.now());
-              // Record sleep hours in history
-              VitalHistoryService.instance.record(
-                'sleep', total / 60.0);
-              notifyListeners();
+        case 0x53: // Sleep data from band — OFFICIAL JStyle SDK format
+          // (verified against blesdk2025_plugin resolve_util.getSleepData)
+          //
+          // Paginated history. Two packet layouts:
+          //  A) Multi-record: 34 bytes per record —
+          //     [0]=0x53, [3..8]=BCD date YY MM DD HH mm ss (segment START),
+          //     [9]=sample count (≤24), [10..]=per-sample sleep quality,
+          //     each sample = 5 minutes.
+          //  B) Single long record (length 130, or 132 with end marker):
+          //     same header, but each sample = 1 minute.
+          //  End of pagination: last byte 0xff AND second-to-last == 0x53.
+          //
+          // Quality value = movement level in that interval.
+          // Stage thresholds (tunable — validate against vendor app):
+          //   ≤ deepMax → deep, ≤ lightMax → light, above → awake.
+          {
+            final isEnd53 = d.length >= 2 &&
+                d[d.length - 1] == 0xff && d[d.length - 2] == _SLEEP;
+
+            void addSegment(int off, int unitMin) {
+              final dt = _parseDate(d, off + 3);
+              if (dt == null) return;
+              final n = d[off + 9] & 0xff;
+              for (int j = 0; j < n; j++) {
+                final idx = off + 10 + j;
+                if (idx >= d.length) break;
+                final t = dt.add(Duration(minutes: j * unitMin));
+                // Dedupe by minute across repeated syncs
+                _sleepSamples[t.millisecondsSinceEpoch ~/ 60000] =
+                    (d[idx] & 0xff, unitMin);
+              }
+            }
+
+            if (d.length == 130 || (isEnd53 && d.length == 132)) {
+              addSegment(0, 1); // 1-minute resolution variant
+            } else {
+              const rec = 34;
+              final size = d.length ~/ rec;
+              for (int i = 0; i < size; i++) {
+                if (i * rec + 34 > d.length) break;
+                addSegment(i * rec, 5);
+              }
+            }
+
+            if (isEnd53) {
+              _endHistory(_SLEEP);
+              _rebuildSleepFromSamples();
+            } else if (_historyPending[_SLEEP] == true) {
+              _continueHistory(_SLEEP);
+            } else {
+              // Live one-shot request (init) — still rebuild
+              _rebuildSleepFromSamples();
             }
           }
           break;
@@ -1332,6 +1433,82 @@ class BleService extends ChangeNotifier {
     _vitalAge = (34 + adj).clamp(20, 65);
   }
 
+  // ─────────────────────────────────────────────────────
+  //  SLEEP ASSEMBLY
+  //  Raw per-interval quality samples collected from 0x53
+  //  packets. Key = epoch-minute, value = (quality, unitMin).
+  // ─────────────────────────────────────────────────────
+  final Map<int, (int, int)> _sleepSamples = {};
+
+  // Stage thresholds — quality value = movement in the interval.
+  // Tunable: validate totals against the vendor (JCVital) app.
+  static const int _deepMax  = 3;   // 0–3   → deep sleep
+  static const int _lightMax = 40;  // 4–40  → light sleep, >40 → awake
+
+  void _rebuildSleepFromSamples() {
+    if (_sleepSamples.isEmpty) return;
+
+    // Drop samples older than 7 days to bound memory
+    final weekAgo = DateTime.now()
+        .subtract(const Duration(days: 7))
+        .millisecondsSinceEpoch ~/ 60000;
+    _sleepSamples.removeWhere((k, _) => k < weekAgo);
+    if (_sleepSamples.isEmpty) return;
+
+    // Group samples into "nights": a sample belongs to the night of
+    // the calendar date 12h before it (22:00 Jan 5 and 06:30 Jan 6
+    // both map to night "Jan 5").
+    final Map<int, List<MapEntry<int, (int, int)>>> nights = {};
+    for (final e in _sleepSamples.entries) {
+      final t = DateTime.fromMillisecondsSinceEpoch(e.key * 60000);
+      final shifted = t.subtract(const Duration(hours: 12));
+      final nightKey =
+          DateTime(shifted.year, shifted.month, shifted.day)
+              .millisecondsSinceEpoch;
+      nights.putIfAbsent(nightKey, () => []).add(e);
+    }
+
+    // Build BMHSleepData for the most recent night with enough data
+    final sortedNights = nights.keys.toList()..sort();
+    for (final nk in sortedNights.reversed) {
+      final samples = nights[nk]!..sort((a, b) => a.key.compareTo(b.key));
+      int deep = 0, light = 0, awake = 0;
+      for (final s in samples) {
+        final (q, unit) = s.value;
+        if (q <= _deepMax) { deep += unit; }
+        else if (q <= _lightMax) { light += unit; }
+        else { awake += unit; }
+      }
+      final total = deep + light; // asleep time (excludes awake)
+      // Valid night: 30 min – 16 h of tracked time
+      if (total < 30 || total + awake > 960) continue;
+
+      final endTime =
+          DateTime.fromMillisecondsSinceEpoch(samples.last.key * 60000)
+              .add(Duration(minutes: samples.last.value.$2));
+
+      final isNew = _lastSleep == null ||
+          _lastSleep!.date != endTime ||
+          _lastSleep!.totalMinutes != total;
+      _lastSleep = BMHSleepData(
+        totalMinutes: total,
+        deepMinutes:  deep,
+        lightMinutes: light,
+        remMinutes:   0, // band does not report REM in 0x53
+        awakeMinutes: awake,
+        quality: _sleepQ(total),
+        date: endTime);
+
+      if (isNew) {
+        // recordAt dedupes within 1 min, so repeated syncs are safe
+        VitalHistoryService.instance
+            .recordAt('sleep', endTime, total / 60.0);
+        notifyListeners();
+      }
+      break; // only the most recent valid night drives the UI
+    }
+  }
+
   void _seedSleep() {
     // Wait for real sleep data from band
     // If no data arrives in 10s, show -- (not placeholder)
@@ -1357,6 +1534,9 @@ class BleService extends ChangeNotifier {
   Future<void> disconnectDevice(BMHDeviceType type) async {
     if (type != BMHDeviceType.bioScale) {
       _manualDisconnect = true; // user chose this — stop all auto-reconnect
+      // Also disable launch auto-reconnect (re-enabled on next connect)
+      SharedPreferences.getInstance()
+          .then((p) => p.setBool(_kAutoRc, false));
     }
     _reconnectCount = 0;
     _reconnectTimer?.cancel();

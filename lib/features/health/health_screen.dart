@@ -1160,16 +1160,26 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                                     style: BMHText.monoSm.copyWith(fontSize: 8)))),
                                 bottomTitles: AxisTitles(sideTitles: SideTitles(
                                   showTitles: true, reservedSize: 22,
-                                  interval: _range == 0 ? 2 : 1,
+                                  interval: 1,
                                   getTitlesWidget: (v, meta) {
                                     if (_range == 0) {
-                                      // Daily — show every 2 hours to avoid crowding
-                                      final h = v.toInt();
-                                      if (h % 2 != 0) return const SizedBox();
-                                      if (h == 0)  return Text('12a', style: BMHText.monoSm.copyWith(fontSize: 7));
-                                      if (h == 12) return Text('12p', style: BMHText.monoSm.copyWith(fontSize: 7));
-                                      if (h < 12)  return Text('${h}a',    style: BMHText.monoSm.copyWith(fontSize: 7));
-                                      return Text('${h - 12}p', style: BMHText.monoSm.copyWith(fontSize: 7));
+                                      // Daily — x is a half-hour slot (0–47).
+                                      // Labels like 10am, 10:30am. Adaptive
+                                      // thinning: label step grows with the
+                                      // span of data so labels never crowd.
+                                      final slot = v.round();
+                                      if (slot < 0 || slot > 47) return const SizedBox();
+                                      final xs = _spots.map((s) => s.x.toInt()).toList();
+                                      final span = xs.isEmpty ? 48
+                                          : (xs.reduce((a, b) => a > b ? a : b) -
+                                             xs.reduce((a, b) => a < b ? a : b)) + 1;
+                                      // ≤6 labels on screen: step in half-hours
+                                      final step = span <= 6 ? 1 : span <= 12 ? 2
+                                                 : span <= 24 ? 4 : 8;
+                                      if (slot % step != 0) return const SizedBox();
+                                      return Text(
+                                        VitalHistoryService.halfHourLabel(slot),
+                                        style: BMHText.monoSm.copyWith(fontSize: 7));
                                     }
                                     if (_range == 1) {
                                       // Weekly — fixed 7 positions 0–6 = MON–SUN
@@ -1190,8 +1200,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                                 rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false))),
                               borderData: FlBorderData(show: false),
                               minY: _cfg.minY, maxY: _cfg.maxY,
-                              minX: _range == 0 ? 0 : 0,
-                              maxX: _range == 0 ? 23 : _range == 1 ? 6 : 3,
+                              minX: 0,
+                              maxX: _range == 0 ? 47 : _range == 1 ? 6 : 3,
                               // Normal range band
                               rangeAnnotations: RangeAnnotations(horizontalRangeAnnotations: [
                                 HorizontalRangeAnnotation(

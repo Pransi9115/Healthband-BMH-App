@@ -6,6 +6,8 @@ import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_global_nav.dart';
 import '../home/daily_checkin_screen.dart';
+import '../auth/welcome_screen.dart';
+import '../../core/auth/auth_service.dart';
 
 // ─────────────────────────────────────────────────────────
 //  BATTERY INTENT HELPER
@@ -514,6 +516,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: BMHColors.bg0,
                       fontWeight: FontWeight.w700)))),
             ])),
+
+          const SizedBox(height: 24),
+
+          // ── SIGN OUT ────────────────────────────────
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: BMHColors.sCardio,
+                side: BorderSide(
+                  color: BMHColors.sCardio.withOpacity(0.5)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(BMHRadius.full)),
+                padding: const EdgeInsets.symmetric(vertical: 12)),
+              icon: const Icon(Icons.logout_rounded, size: 18),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: BMHColors.bg1,
+                    title: Text('Sign Out?',
+                      style: BMHText.labelLg),
+                    content: Text(
+                      'You will need to log in again next time.',
+                      style: BMHText.bodySm.copyWith(
+                        color: BMHColors.inkDim)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel')),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: Text('Sign Out',
+                          style: TextStyle(color: BMHColors.sCardio))),
+                    ])); 
+                if (confirm != true || !context.mounted) return;
+                await AuthService.instance.logout();
+                if (!context.mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => const WelcomeScreen()),
+                  (_) => false);
+              },
+              label: Text('Sign Out',
+                style: BMHText.labelLg.copyWith(
+                  color: BMHColors.sCardio,
+                  fontWeight: FontWeight.w700)))),
 
           const SizedBox(height: 40),
         ],

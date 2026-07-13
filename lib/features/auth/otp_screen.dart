@@ -5,6 +5,7 @@ import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_screen.dart';
 import '../home/main_shell.dart';
+import '../../core/auth/auth_service.dart';
 
 class OtpScreen extends StatefulWidget {
   final String email;
@@ -52,7 +53,14 @@ class _OtpScreenState extends State<OtpScreen> {
   Future<void> _verify() async {
     if (_otp.length < 6) return;
     setState(() => _loading = true);
+
+    // TODO(api): verify OTP against your backend; on success save
+    // the real tokens returned by the server.
     await Future.delayed(const Duration(milliseconds: 1400));
+    await AuthService.instance.saveSession(
+      accessToken: 'local-session-${DateTime.now().millisecondsSinceEpoch}',
+    );
+
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
