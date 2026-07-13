@@ -617,15 +617,28 @@ class BleService extends ChangeNotifier {
   }
 
   // Send mode=0 (start). _parse() handles mode=2 continuation
+  final Map<int, int> _historyContinueCount = {};
+  static const int _maxHistoryContinues = 80; // ~30 days of records
+
   Future<void> _fetchHistory(int cmd) async {
     if (!isBandConnected || _writeChar == null) return;
     _historyPending[cmd] = true;
+    _historyContinueCount[cmd] = 0;
     await _write(_cmd([cmd, _MODE_START]));
   }
 
   Future<void> _continueHistory(int cmd) async {
     if (!isBandConnected || _writeChar == null) return;
     if (_historyPending[cmd] != true) return;
+    // HARD SAFETY CAP — if the band's end marker is ever missed,
+    // stop after a bounded number of pages instead of flooding the
+    // band with continue commands forever (freezes UI, drops link).
+    final n = (_historyContinueCount[cmd] ?? 0) + 1;
+    _historyContinueCount[cmd] = n;
+    if (n > _maxHistoryContinues) {
+      _endHistory(cmd);
+      return;
+    }
     await _delay(200);
     await _write(_cmd([cmd, _MODE_CONTINUE]));
   }
@@ -1096,8 +1109,12 @@ class BleService extends ChangeNotifier {
           // Stage thresholds (tunable — validate against vendor app):
           //   ≤ deepMax → deep, ≤ lightMax → light, above → awake.
           {
-            final isEnd53 = d.length >= 2 &&
-                d[d.length - 1] == 0xff && d[d.length - 2] == _SLEEP;
+            // End detection: match the other history handlers — a
+            // trailing 0xff terminates pagination. (The stricter
+            // "0x53 0xff" pair check could miss the band's actual end
+            // packet and loop forever, flooding the band with
+            // continue commands → frozen UI → watchdog kill.)
+            final isEnd53 = d.isNotEmpty && d[d.length - 1] == 0xff;
 
             void addSegment(int off, int unitMin) {
               final dt = _parseDate(d, off + 3);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -125,8 +126,46 @@ class VitalHistoryService extends ChangeNotifier {
     final cutoff = DateTime.now().subtract(const Duration(days: 90));
     _cache[key]!.removeWhere((r) => r.timestamp.isBefore(cutoff));
 
-    await _persist(key);
-    notifyListeners();
+    _schedulePersist(key);
+    _throttledNotify();
+  }
+
+  // ── DEBOUNCED PERSISTENCE + THROTTLED NOTIFY ─────────
+  // During band history sync, hundreds of readings arrive in
+  // seconds. Serializing the full array to SharedPreferences and
+  // rebuilding the UI for every single one freezes scrolling on
+  // iPhone (and can trigger the iOS watchdog kill). Instead:
+  // batch disk writes (1s after the burst ends) and rebuild the
+  // UI at most ~3×/second.
+  final Set<String> _dirtyKeys = {};
+  Timer? _persistTimer;
+  DateTime _lastNotify = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? _notifyTimer;
+
+  void _schedulePersist(String key) {
+    _dirtyKeys.add(key);
+    _persistTimer?.cancel();
+    _persistTimer = Timer(const Duration(seconds: 1), () async {
+      final keys = List<String>.from(_dirtyKeys);
+      _dirtyKeys.clear();
+      for (final k in keys) {
+        await _persist(k);
+      }
+    });
+  }
+
+  void _throttledNotify() {
+    final now = DateTime.now();
+    if (now.difference(_lastNotify).inMilliseconds >= 300) {
+      _lastNotify = now;
+      notifyListeners();
+    } else if (_notifyTimer == null || !_notifyTimer!.isActive) {
+      // Guarantee one trailing rebuild after the burst
+      _notifyTimer = Timer(const Duration(milliseconds: 350), () {
+        _lastNotify = DateTime.now();
+        notifyListeners();
+      });
+    }
   }
 
   // ── RECORD A READING ─────────────────────────────────
@@ -157,8 +196,8 @@ class VitalHistoryService extends ChangeNotifier {
     final cutoff = now.subtract(const Duration(days: 90));
     _cache[key]!.removeWhere((r) => r.timestamp.isBefore(cutoff));
 
-    await _persist(key);
-    notifyListeners();
+    _schedulePersist(key);
+    _throttledNotify();
   }
 
   Future<void> _persist(String key) async {
