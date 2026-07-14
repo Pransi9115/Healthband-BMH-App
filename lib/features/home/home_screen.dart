@@ -185,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           signalColor: BMHColors.sGut,
                           icon: Icons.monitor_weight_outlined),
                       ]),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 16),
                     // ── MODULES ───────────────────────────
                     BMHSectionTitle('Modules'),
                     const SizedBox(height: 16),
@@ -223,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       signalColor: BMHColors.sMetabolic,
                       icon: const Icon(Icons.restaurant_menu_outlined)),
                     BMHModuleCard(
-                      title: 'Care Team',
+                      title: 'Bio Care Team',
                       subtitle: 'Doctors · Coaches · Consults',
                       signalColor: BMHColors.sSleep,
                       icon: const Icon(Icons.people_outline_rounded)),

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../settings/legal_screen.dart';
+import '../auth/welcome_screen.dart';
+import '../../core/auth/auth_service.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/theme/bmh_tokens.dart';
@@ -178,6 +180,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                     MaterialPageRoute(builder: (_) =>
                       const LegalScreen(kind: LegalKind.terms))),
                   last: true),
+              ]),
+              const SizedBox(height: 16),
+              // ── SIGN OUT — returns to Sign In / Sign Up ──
+              _buildSettingsCard([
+                _buildTile(Icons.logout_rounded, BMHColors.sCardio,
+                  'Sign Out', '', _confirmSignOut, last: true),
               ]),
               const SizedBox(height: 120),
             ],
@@ -971,6 +979,33 @@ class _ProfileScreenState extends State<ProfileScreen>
             onPressed: () { setState(() {}); _saveProfile(); Navigator.pop(ctx); },
             child: const Text('Save')),
         ]));
+  }
+
+  // Sign out → clears the saved session and returns the user to
+  // the Welcome screen (Sign In / Sign Up).
+  Future<void> _confirmSignOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: BMHColors.bg3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(BMHRadius.lg)),
+        title: Text('Sign Out?', style: BMHText.heading2),
+        content: Text('You will need to log in again next time.',
+          style: BMHText.bodySm.copyWith(color: BMHColors.ink2)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Sign Out',
+              style: TextStyle(color: BMHColors.sCardio))),
+        ]));
+    if (confirm != true || !mounted) return;
+    await AuthService.instance.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      (_) => false);
   }
 
   void _showStepGoal() {

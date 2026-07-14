@@ -2052,8 +2052,6 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
     final remMin = sleep?.remMinutes ?? 0;
     final awakeMin = sleep?.awakeMinutes ?? 0;
     final eff = _efficiency();
-    final spo2 = _ble.spo2;
-    final hrv = _ble.hrv;
 
     final sleepStatus = sleep != null ? _sleepStatus(totalHrs) : 'No data';
 
@@ -2287,19 +2285,7 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
                       status: sleep != null
                         ? _deepStatus(deepMin) : 'No data',
                       barColor: BMHColors.sSleep,
-                      barFraction: deepMin / 120.0),
-                    _overviewRow(
-                      label: 'Avg SpO2',
-                      value: spo2 > 0 ? '$spo2%' : '--',
-                      status: spo2 > 0 ? _spo2Status(spo2) : 'No data',
-                      barColor: const Color(0xFF5bc4f5),
-                      barFraction: spo2 / 100.0),
-                    _overviewRow(
-                      label: 'Avg HRV',
-                      value: hrv > 0 ? '$hrv ms' : '--',
-                      status: hrv > 0 ? _hrvStatus(hrv) : 'No data',
-                      barColor: BMHColors.sGut,
-                      barFraction: hrv / 100.0,
+                      barFraction: deepMin / 120.0,
                       isLast: true),
                   ])),
 

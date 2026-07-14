@@ -23,7 +23,7 @@ class BMHGlobalNav extends StatelessWidget {
 
   static const _items = [
     (Icons.home_rounded, Icons.home_outlined, 'Home'),
-    (Icons.monitor_heart_rounded, Icons.monitor_heart_outlined, 'Bio Health\nCare Band'),
+    (Icons.monitor_heart_rounded, Icons.monitor_heart_outlined, 'Bio Band'),
     (Icons.self_improvement_rounded, Icons.self_improvement_outlined, 'Wellness'),
     (Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
   ];
