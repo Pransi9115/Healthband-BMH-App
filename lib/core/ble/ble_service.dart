@@ -651,6 +651,18 @@ class BleService extends ChangeNotifier {
   /// packet — BP results only land in these history records.
   Future<void> syncHrvHistory() => _fetchHistory(_HRV);
 
+  // ── MEASUREMENT COMPLETION SIGNAL ─────────────────────
+  // The band streams 0x28 result packets while measuring; a packet
+  // with a VALID value for the measured type means the measurement
+  // produced its result. Measure Now uses this instead of guessing
+  // with timers.
+  final Map<int, DateTime> _lastResultAt = {};
+  void _markResult(int type) => _lastResultAt[type] = DateTime.now();
+
+  /// When the band last delivered a valid result for a 0x28 type
+  /// (0x01 HRV, 0x02 HR, 0x03 SpO2, 0x04 Temp, 0x05 Stress).
+  DateTime? lastResultAt(int type) => _lastResultAt[type];
+
   // ─────────────────────────────────────────────────────
   //  BCD helpers — SDK _bcd2String equivalent
   // ─────────────────────────────────────────────────────
@@ -1389,13 +1401,16 @@ class BleService extends ChangeNotifier {
 
             switch (type) {
               case 0x01: // HRV
-                if (val > 0 && val < 250) _hrv = val;
+                if (val > 0 && val < 250) {
+                  _hrv = val;
+                  _markResult(0x01);
+                }
                 break;
               case 0x02: // HR
-                if (val > 30 && val < 220) { _heartRate = val; _calcAge(); }
+                if (val > 30 && val < 220) { _heartRate = val; _calcAge(); _markResult(0x02); }
                 break;
               case 0x03: // SpO2
-                if (val > 60 && val <= 100) _spo2 = val;
+                if (val > 60 && val <= 100) { _spo2 = val; _markResult(0x03); }
                 break;
               case 0x04: // Temperature — 2-byte little-endian like 0x09
                 // d[3] alone is wrong (max 255 → 25.5°C)
@@ -1408,10 +1423,13 @@ class BleService extends ChangeNotifier {
                   // fallback: single byte with band calibration offset
                   t04 = (d[3] & 0xff) + 33.0;
                 }
-                if (t04 > 34.0 && t04 < 42.0) _temperature = (t04 * 10).roundToDouble() / 10;
+                if (t04 > 34.0 && t04 < 42.0) {
+                  _temperature = (t04 * 10).roundToDouble() / 10;
+                  _markResult(0x04);
+                }
                 break;
               case 0x05: // Stress
-                if (val > 0 && val <= 100) _stressLevel = val;
+                if (val > 0 && val <= 100) { _stressLevel = val; _markResult(0x05); }
                 break;
             }
           }

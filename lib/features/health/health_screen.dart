@@ -1056,21 +1056,30 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
       'Stress Level':   0x05,
     };
 
-    // These metrics are NOT streamed live during measurement — their
-    // results arrive only in 0x56 history records, so we must sync
-    // history to receive them, and only accept a CHANGED value.
-    final needsHistorySync =
-        {'Blood Pressure', 'HRV', 'Stress Level'}.contains(widget.title);
+    // 0x28 result-packet type per vital — the band's own
+    // "measurement produced a result" signal.
+    final resultTypeMap = {
+      'Heart Rate':     0x02,
+      'HRV':            0x01,
+      'Blood Pressure': 0x01, // BP rides on the HRV measurement
+      'SpO₂':           0x03,
+      'Temperature':    0x04,
+      'Stress Level':   0x05,
+    };
+
+    final isBp = widget.title == 'Blood Pressure';
 
     final state    = ValueNotifier(MeasurementState.preparing);
     final seconds  = ValueNotifier<int?>(null);
     final value    = ValueNotifier<String?>(null);
     var cancelled  = false;
     final baseline = _bandValue;
+    final startAt  = DateTime.now();
+    // HRV/BP measurements run ~60s on the band — give them room.
     final measureSec =
         widget.title == 'Temperature' ? 20
       : widget.title == 'Steps Today' ? 10
-      : needsHistorySync ? 45 : 35;
+      : (isBp || widget.title == 'HRV') ? 75 : 40;
 
     Future<void> stopCmd() async {
       final t = typeMap[widget.title];
@@ -1098,9 +1107,40 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     state.value = MeasurementState.measuring;
     seconds.value = measureSec;
 
-    // Poll the live values the band sends back; complete on a real
-    // update, fail on timeout/disconnect.
+    // True when the band has delivered a valid result packet for
+    // this measurement since we started it.
+    bool bandDone() {
+      final rt = resultTypeMap[widget.title];
+      if (rt == null) return false;
+      final at = _ble.lastResultAt(rt);
+      return at != null && at.isAfter(startAt);
+    }
+
+    Future<void> succeedWith(String? v) async {
+      state.value = MeasurementState.processing;
+      // BP lives only in the band's 0x56 history records — fetch
+      // them now that the measurement is complete, then give the
+      // record a few seconds to arrive.
+      if (isBp) {
+        await _ble.syncHrvHistory();
+        for (int i = 0; i < 8 && !cancelled; i++) {
+          await Future.delayed(const Duration(seconds: 1));
+          final nv = _bandValue;
+          if (nv != null && nv != baseline) { v = nv; break; }
+          v = nv ?? v;
+        }
+      } else {
+        await Future.delayed(const Duration(milliseconds: 900));
+        v = _bandValue ?? v;
+      }
+      if (cancelled) return;
+      value.value = v;
+      seconds.value = null;
+      state.value = MeasurementState.success;
+    }
+
     var elapsed = 0;
+    var completed = false;
     while (elapsed < measureSec && !cancelled && mounted) {
       await Future.delayed(const Duration(seconds: 1));
       elapsed++;
@@ -1112,36 +1152,50 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
         break;
       }
 
-      // BP/HRV/Stress: pull the 0x56 history a few times during the
-      // window so the band's freshly measured record reaches us.
-      if (needsHistorySync && (elapsed == 18 || elapsed == 30 ||
-          elapsed == measureSec - 5)) {
-        _ble.syncHrvHistory();
-      }
-
       final v = _bandValue;
       final changed = v != null && v != baseline;
-      // Live-streamed metrics (HR/SpO₂/Temp/Glucose/Steps): an
-      // identical stable reading after ~12s is a legitimate result.
-      // History-based metrics (BP/HRV/Stress): only accept a CHANGE —
-      // otherwise we'd re-display the old record as a new reading.
-      final accept = elapsed >= 5 &&
-          (changed || (!needsHistorySync && v != null && elapsed >= 12));
-      if (accept) {
-        state.value = MeasurementState.processing;
-        await Future.delayed(const Duration(milliseconds: 900));
-        value.value = v;
-        seconds.value = null;
-        state.value = MeasurementState.success;
+
+      // Primary: the band says the measurement produced its result.
+      if (elapsed >= 5 && bandDone()) {
+        await stopCmd();
+        await succeedWith(v);
+        completed = true;
+        break;
+      }
+      // Fallbacks: a changed live value is always a result; metrics
+      // without result packets (Steps/Glucose) accept a stable live
+      // value after 12s.
+      final noResultPacket = resultTypeMap[widget.title] == null;
+      if (elapsed >= 5 &&
+          (changed && !isBp ||
+           (noResultPacket && v != null && elapsed >= 12))) {
+        await stopCmd();
+        await succeedWith(v);
+        completed = true;
         break;
       }
     }
 
-    if (!cancelled &&
-        state.value != MeasurementState.success &&
+    if (!cancelled && !completed &&
         state.value != MeasurementState.deviceDisconnected) {
-      seconds.value = null;
-      state.value = MeasurementState.failed;
+      // Last chance for BP: the record may have been written even if
+      // we missed the result packet — fetch history once more.
+      if (isBp && _ble.isBandConnected) {
+        await _ble.syncHrvHistory();
+        for (int i = 0; i < 8 && !cancelled; i++) {
+          await Future.delayed(const Duration(seconds: 1));
+          final nv = _bandValue;
+          if (nv != null && nv != baseline) {
+            await succeedWith(nv);
+            completed = true;
+            break;
+          }
+        }
+      }
+      if (!completed && !cancelled) {
+        seconds.value = null;
+        state.value = MeasurementState.failed;
+      }
     }
 
     await stopCmd();
