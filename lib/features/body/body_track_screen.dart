@@ -439,6 +439,7 @@ class _BodyTrackScreenState extends State<BodyTrackScreen>
 
                     // Composition grid
                     GridView.count(
+                      padding: EdgeInsets.zero,
                       crossAxisCount: 3,
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),

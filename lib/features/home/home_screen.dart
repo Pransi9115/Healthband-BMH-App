@@ -149,6 +149,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     GridView.count(
                       crossAxisCount: 3,
                       shrinkWrap: true,
+                      // CRITICAL: without this, a nested GridView
+                      // inherits the phone's safe-area insets as
+                      // padding — that was the mystery gap between
+                      // Today's overview and Modules.
+                      padding: EdgeInsets.zero,
                       physics: const NeverScrollableScrollPhysics(),
                       mainAxisSpacing: 10,
                       crossAxisSpacing: 10,
@@ -185,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           signalColor: BMHColors.sGut,
                           icon: Icons.monitor_weight_outlined),
                       ]),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     // ── MODULES ───────────────────────────
                     BMHSectionTitle('Modules'),
                     const SizedBox(height: 16),

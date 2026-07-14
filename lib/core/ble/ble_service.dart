@@ -645,6 +645,12 @@ class BleService extends ChangeNotifier {
 
   void _endHistory(int cmd) => _historyPending[cmd] = false;
 
+  /// Public: fetch the HRV history (0x56) which carries the freshest
+  /// HRV + Blood Pressure + Stress records. Called by the Measure Now
+  /// flow because the band does NOT stream BP in its live measurement
+  /// packet — BP results only land in these history records.
+  Future<void> syncHrvHistory() => _fetchHistory(_HRV);
+
   // ─────────────────────────────────────────────────────
   //  BCD helpers — SDK _bcd2String equivalent
   // ─────────────────────────────────────────────────────

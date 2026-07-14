@@ -358,9 +358,9 @@ class _HealthScreenState extends State<HealthScreen>
                 // TOP BAR
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    BMHEyebrow('Bio Health Care Band', showDot: _ble.isBandConnected),
+                    BMHEyebrow('Bio Band', showDot: _ble.isBandConnected),
                     const SizedBox(height: 4),
-                    Text('Bio Health Care Band', style: BMHText.heading1.copyWith(fontSize: 24)),
+                    Text('Bio Band', style: BMHText.heading1),
                   ]),
                   Flexible(child: Row(mainAxisSize: MainAxisSize.min, children: [
                     // Refresh circle button
@@ -1029,11 +1029,23 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
 
   Future<void> _measureNow() async {
     if (!_ble.isBandConnected || _isMeasuring) return;
+
+    // Wear check — measuring off-wrist returns garbage
+    if (!_ble.isWearing) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Please wear the band on your wrist to measure',
+          style: BMHText.monoSm.copyWith(color: BMHColors.bg0)),
+        backgroundColor: BMHColors.sMetabolic,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(BMHRadius.full))));
+      return;
+    }
     setState(() => _isMeasuring = true);
 
     // Band measurement command codes (0x2C type parameter).
     // Blood Pressure uses the HRV measurement (0x01) — the band
-    // returns BP as part of the HRV result packet.
+    // returns BP as part of the HRV result records.
     final typeMap = {
       'Heart Rate':     0x00,
       'HRV':            0x01,
@@ -1044,6 +1056,12 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
       'Stress Level':   0x05,
     };
 
+    // These metrics are NOT streamed live during measurement — their
+    // results arrive only in 0x56 history records, so we must sync
+    // history to receive them, and only accept a CHANGED value.
+    final needsHistorySync =
+        {'Blood Pressure', 'HRV', 'Stress Level'}.contains(widget.title);
+
     final state    = ValueNotifier(MeasurementState.preparing);
     final seconds  = ValueNotifier<int?>(null);
     final value    = ValueNotifier<String?>(null);
@@ -1051,7 +1069,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     final baseline = _bandValue;
     final measureSec =
         widget.title == 'Temperature' ? 20
-      : widget.title == 'Steps Today' ? 10 : 35;
+      : widget.title == 'Steps Today' ? 10
+      : needsHistorySync ? 45 : 35;
 
     Future<void> stopCmd() async {
       final t = typeMap[widget.title];
@@ -1080,7 +1099,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     seconds.value = measureSec;
 
     // Poll the live values the band sends back; complete on a real
-    // update (value changed from baseline), fail on timeout/disconnect.
+    // update, fail on timeout/disconnect.
     var elapsed = 0;
     while (elapsed < measureSec && !cancelled && mounted) {
       await Future.delayed(const Duration(seconds: 1));
@@ -1092,10 +1111,23 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
         await Future.delayed(const Duration(seconds: 4));
         break;
       }
+
+      // BP/HRV/Stress: pull the 0x56 history a few times during the
+      // window so the band's freshly measured record reaches us.
+      if (needsHistorySync && (elapsed == 18 || elapsed == 30 ||
+          elapsed == measureSec - 5)) {
+        _ble.syncHrvHistory();
+      }
+
       final v = _bandValue;
-      // Require a few seconds before accepting, so we don't grab a
-      // stale pre-measurement value the instant the modal opens.
-      if (v != null && elapsed >= 5 && (v != baseline || elapsed >= 12)) {
+      final changed = v != null && v != baseline;
+      // Live-streamed metrics (HR/SpO₂/Temp/Glucose/Steps): an
+      // identical stable reading after ~12s is a legitimate result.
+      // History-based metrics (BP/HRV/Stress): only accept a CHANGE —
+      // otherwise we'd re-display the old record as a new reading.
+      final accept = elapsed >= 5 &&
+          (changed || (!needsHistorySync && v != null && elapsed >= 12));
+      if (accept) {
         state.value = MeasurementState.processing;
         await Future.delayed(const Duration(milliseconds: 900));
         value.value = v;
@@ -2222,6 +2254,7 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
                 // ── Sleep stage cards ─────────────────────
                 if (sleep != null) ...[
                   GridView.count(
+                      padding: EdgeInsets.zero,
                     crossAxisCount: 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
