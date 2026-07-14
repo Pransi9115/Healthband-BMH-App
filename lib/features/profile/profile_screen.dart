@@ -2,6 +2,7 @@ import '../../core/health/health_service.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../settings/legal_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/theme/bmh_tokens.dart';
@@ -161,19 +162,22 @@ class _ProfileScreenState extends State<ProfileScreen>
                   'Step Goal', '${_ble.stepGoal} steps', _showStepGoal),
                 _buildTile(Icons.notifications_outlined, BMHColors.sMetabolic,
                   'Notifications', 'On', () {}),
-                _buildTile(Icons.dark_mode_outlined, BMHColors.sSleep,
-                  'Theme', 'Dark', () {}),
                 _buildTile(Icons.language_outlined, BMHColors.sOxygen,
                   'Units', 'Metric', () {}, last: true),
               ]),
               const SizedBox(height: 16),
               _buildSettingsCard([
                 _buildTile(Icons.info_outline_rounded, BMHColors.cyan,
-                  'About BMH', 'v1.0.0', () {}),
+                  'About Bio Medical Healthcare', 'v1.0.0', () {}),
                 _buildTile(Icons.privacy_tip_outlined, BMHColors.inkMute,
-                  'Privacy Policy', '', () {}),
+                  'Privacy Policy', '', () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) =>
+                      const LegalScreen(kind: LegalKind.privacy)))),
                 _buildTile(Icons.description_outlined, BMHColors.inkMute,
-                  'Terms of Service', '', () {}, last: true),
+                  'Terms of Service', '', () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) =>
+                      const LegalScreen(kind: LegalKind.terms))),
+                  last: true),
               ]),
               const SizedBox(height: 120),
             ],
@@ -680,7 +684,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ? _appleLastSynced != null
                         ? 'Last synced: ${_timeAgo(_appleLastSynced!)}'
                         : 'Connected — tap Sync Now'
-                    : 'Sync your BMH data to Apple Health',
+                    : 'Sync your Apple Health Data to BMH',
                 style: BMHText.monoSm.copyWith(
                   fontSize: 9,
                   color: _appleHealthConnected

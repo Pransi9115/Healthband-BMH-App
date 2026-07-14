@@ -1032,7 +1032,7 @@ class BleService extends ChangeNotifier {
               // after being put on. Storing these causes _detectWearing()
               // removal logic to see tempBelowBody=true and wrongly flip
               // _isWearing=false. Real body temp is always >= 35.0°C.
-              if (t >= 35.0 && t < 42.0) _temperature = t;
+              if (t >= 35.0 && t < 42.0) _temperature = (t * 10).roundToDouble() / 10;
             }
           }
           break;
@@ -1291,10 +1291,11 @@ class BleService extends ChangeNotifier {
                 final raw = (d[base + 9] & 0xff) + (d[base + 10] & 0xff) * 256;
                 final t = raw * 0.1;
                 if (t > 34.0 && t < 42.0) {
-                  _temperature = t;
+                  _temperature = (t * 10).roundToDouble() / 10;
                   final dtT = _parseDate(d, base + 3);
-                  if (dtT != null) histT.recordAt('temperature', dtT, t);
-                  else histT.record('temperature', t);
+                  final tR = (t * 10).roundToDouble() / 10;
+                  if (dtT != null) histT.recordAt('temperature', dtT, tR);
+                  else histT.record('temperature', tR);
                 }
               }
             }
@@ -1401,7 +1402,7 @@ class BleService extends ChangeNotifier {
                   // fallback: single byte with band calibration offset
                   t04 = (d[3] & 0xff) + 33.0;
                 }
-                if (t04 > 34.0 && t04 < 42.0) _temperature = t04;
+                if (t04 > 34.0 && t04 < 42.0) _temperature = (t04 * 10).roundToDouble() / 10;
                 break;
               case 0x05: // Stress
                 if (val > 0 && val <= 100) _stressLevel = val;

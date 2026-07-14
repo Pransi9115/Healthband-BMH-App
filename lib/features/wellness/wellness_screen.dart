@@ -3,6 +3,8 @@ import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../health/breathing/breathing_screen.dart';
 import 'womens_biocare_screen.dart';
+import 'senior_biocare_screen.dart';
+import 'activity_screen.dart';
 
 class WellnessScreen extends StatefulWidget {
   const WellnessScreen({super.key});
@@ -141,32 +143,105 @@ class _WellnessScreenState extends State<WellnessScreen>
                     ])),
                 ),
                 const SizedBox(height: 30),
-                BMHSectionTitle('Coming Soon'),
-                const SizedBox(height: 16),
 
-                _ComingSoonCard(
-                  icon: Icons.self_improvement_rounded,
-                  title: 'Meditation',
-                  subtitle: 'Guided mindfulness sessions',
-                  color: BMHColors.sSleep),
-                const SizedBox(height: 10),
-                _ComingSoonCard(
-                  icon: Icons.water_drop_outlined,
-                  title: 'Water Tracker',
-                  subtitle: 'Daily hydration goals',
-                  color: BMHColors.sOxygen),
-                const SizedBox(height: 10),
-                _ComingSoonCard(
-                  icon: Icons.bedtime_outlined,
-                  title: 'Sleep Goals',
-                  subtitle: 'Bedtime reminders & insights',
-                  color: BMHColors.sSleep),
-                const SizedBox(height: 10),
-                _ComingSoonCard(
-                  icon: Icons.spa_outlined,
-                  title: 'Stress Relief',
-                  subtitle: 'Relaxation techniques',
-                  color: BMHColors.sGut),
+                // ── ACTIVITY ─────────────────────────────
+                BMHSectionTitle('Activity'),
+                const SizedBox(height: 16),
+                GestureDetector(
+                  onTap: () => Navigator.push(context,
+                    MaterialPageRoute(
+                      builder: (_) => const ActivityScreen())),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft, end: Alignment.bottomRight,
+                        colors: [
+                          BMHColors.sOxygen.withOpacity(0.12),
+                          BMHColors.sOxygen.withOpacity(0.02)]),
+                      borderRadius: BorderRadius.circular(BMHRadius.xl),
+                      border: Border.all(
+                        color: BMHColors.sOxygen.withOpacity(0.3))),
+                    child: Row(children: [
+                      Container(
+                        width: 60, height: 60,
+                        decoration: BoxDecoration(
+                          color: BMHColors.sOxygen.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: BMHColors.sOxygen.withOpacity(0.25))),
+                        child: const Center(child: Icon(
+                          Icons.directions_bike_outlined,
+                          color: BMHColors.sOxygen, size: 28))),
+                      const SizedBox(width: 16),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                        Text('Activity', style: BMHText.heading2),
+                        const SizedBox(height: 4),
+                        Text('Steps · Distance · Calories · Goals',
+                          style: BMHText.monoSm.copyWith(
+                            color: BMHColors.sOxygen, fontSize: 9)),
+                      ])),
+                      Container(
+                        width: 40, height: 40,
+                        decoration: const BoxDecoration(
+                          color: BMHColors.sOxygen,
+                          shape: BoxShape.circle),
+                        child: const Icon(Icons.arrow_forward_rounded,
+                          color: BMHColors.bg0, size: 18)),
+                    ])),
+                ),
+                const SizedBox(height: 30),
+
+                // ── SENIOR BIOCARE ───────────────────────
+                BMHSectionTitle('Senior Biocare'),
+                const SizedBox(height: 16),
+                GestureDetector(
+                  onTap: () => Navigator.push(context,
+                    MaterialPageRoute(
+                      builder: (_) => const SeniorBiocareScreen())),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft, end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFFe8a33d).withOpacity(0.12),
+                          const Color(0xFFe8a33d).withOpacity(0.02)]),
+                      borderRadius: BorderRadius.circular(BMHRadius.xl),
+                      border: Border.all(
+                        color: const Color(0xFFe8a33d).withOpacity(0.3))),
+                    child: Row(children: [
+                      Container(
+                        width: 60, height: 60,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFe8a33d).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFFe8a33d).withOpacity(0.25))),
+                        child: const Center(child: Icon(
+                          Icons.elderly_rounded,
+                          color: Color(0xFFe8a33d), size: 28))),
+                      const SizedBox(width: 16),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                        Text('Senior Biocare™', style: BMHText.heading2),
+                        const SizedBox(height: 4),
+                        Text('Mobility · Balance · Gentle Strength',
+                          style: BMHText.monoSm.copyWith(
+                            color: const Color(0xFFe8a33d), fontSize: 9)),
+                      ])),
+                      Container(
+                        width: 40, height: 40,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFe8a33d),
+                          shape: BoxShape.circle),
+                        child: const Icon(Icons.arrow_forward_rounded,
+                          color: BMHColors.bg0, size: 18)),
+                    ])),
+                ),
 
                 const SizedBox(height: 120),
               ]),
@@ -175,45 +250,4 @@ class _WellnessScreenState extends State<WellnessScreen>
       ]),
     );
   }
-}
-
-class _ComingSoonCard extends StatelessWidget {
-  final IconData icon;
-  final String title, subtitle;
-  final Color color;
-  const _ComingSoonCard({
-    required this.icon, required this.title,
-    required this.subtitle, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: BMHColors.surface,
-      borderRadius: BorderRadius.circular(BMHRadius.lg),
-      border: Border.all(color: BMHColors.line)),
-    child: Row(children: [
-      Container(
-        width: 48, height: 48,
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2))),
-        child: Center(child: Icon(icon, color: color, size: 22))),
-      const SizedBox(width: 14),
-      Expanded(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: BMHText.heading2),
-        Text(subtitle, style: BMHText.monoSm.copyWith(
-          fontSize: 9, color: BMHColors.inkMute)),
-      ])),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: BMHColors.bg4,
-          borderRadius: BorderRadius.circular(BMHRadius.full),
-          border: Border.all(color: BMHColors.line)),
-        child: Text('Soon', style: BMHText.monoSm.copyWith(
-          fontSize: 8, color: BMHColors.inkMute))),
-    ]));
 }

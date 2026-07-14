@@ -12,6 +12,7 @@ import '../health/health_screen.dart';
 import '../settings/settings_screen.dart';
 import 'main_shell.dart';
 import 'daily_checkin_screen.dart';
+import 'biomedical_monitoring_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,18 +26,28 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _syncDone = false;
   double _profileWeight = 0;
   bool _checkInDoneToday = false;
+  String _userName = '';
 
   @override
   void initState() {
     super.initState();
     _ble.addListener(_onBleUpdate);
     _loadProfileWeight();
+    _loadUserName();
     _checkTodaysCheckIn();
   }
 
   Future<void> _checkTodaysCheckIn() async {
     final entry = await CheckInService.todaysEntry();
     if (mounted) setState(() => _checkInDoneToday = entry != null);
+  }
+
+  Future<void> _loadUserName() async {
+    final p = await SharedPreferences.getInstance();
+    final n = p.getString('profile_name') ?? '';
+    if (mounted && n != _userName) {
+      setState(() => _userName = n);
+    }
   }
 
   Future<void> _loadProfileWeight() async {
@@ -78,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _loadUserName(); // no-op unless the name changed in Profile
     return Scaffold(
       backgroundColor: const Color(0xFF080f1e),
       body: Stack(children: [
@@ -107,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onSettings: _onSettings),
                     const SizedBox(height: 32),
                     // ── GREETING ─────────────────────────
-                    _Greeting(),
+                    _Greeting(name: _userName),
                     const SizedBox(height: 28),
                     // ── BIOSCORE HERO RING ────────────────
                     // Same BioScoreCalculator used on the Health tab —
@@ -189,16 +201,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       expandedContent: _HealthModulePreview()),
                     BMHModuleCard(
-                      title: 'Body Track',
+                      title: 'Bio Body Track',
                       subtitle: 'BioScale · Composition',
                       signalColor: BMHColors.sBody,
                       icon: const Icon(Icons.accessibility_new_outlined),
                       expandedContent: _BodyModulePreview()),
                     BMHModuleCard(
-                      title: 'Activity',
-                      subtitle: 'Steps · Workouts · Goals',
-                      signalColor: BMHColors.sOxygen,
-                      icon: const Icon(Icons.directions_bike_outlined)),
+                      title: 'Biomedical Monitoring',
+                      subtitle: 'Blood · GUT · DNA',
+                      signalColor: BMHColors.sDna,
+                      icon: const Icon(Icons.biotech_outlined),
+                      expandedContent: const _BiomedicalMonitoringPreview()),
                     BMHModuleCard(
                       title: 'Medicines',
                       subtitle: 'Schedule · Reminders',
@@ -385,23 +398,31 @@ class _HeaderBtn extends StatelessWidget {
 //  GREETING
 // ─────────────────────────────────────────────────────────
 class _Greeting extends StatelessWidget {
+  final String name;
+  const _Greeting({this.name = ''});
+
   @override
   Widget build(BuildContext context) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12 ? 'Good morning'
                    : hour < 18 ? 'Good afternoon' : 'Good evening';
+    // Show the user's real name (set at Sign Up, editable in
+    // Profile). If none stored ('BMH User' default), greet plainly.
+    final display =
+        (name.isEmpty || name == 'BMH User') ? '' : name.split(' ').first;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const BMHEyebrow('All systems operating', showDot: true),
       const SizedBox(height: 8),
       Text.rich(TextSpan(
         style: BMHText.greetTitle,
         children: [
-          TextSpan(text: '$greeting, '),
-          const TextSpan(text: 'Rahul',
-            style: TextStyle(
-              fontStyle: FontStyle.italic,
-              color: Color(0xFF00c8c8),
-              fontWeight: FontWeight.w400)),
+          TextSpan(text: display.isEmpty ? greeting : '$greeting, '),
+          if (display.isNotEmpty)
+            TextSpan(text: display,
+              style: const TextStyle(
+                fontStyle: FontStyle.italic,
+                color: Color(0xFF00c8c8),
+                fontWeight: FontWeight.w400)),
         ])),
       const SizedBox(height: 8),
       Text('Your biology is listening. Here\'s today\'s snapshot.',
@@ -719,3 +740,36 @@ class _BodyModulePreview extends StatelessWidget {
 }
 
 // end of file
+
+// ─────────────────────────────────────────────────────────
+//  BIOMEDICAL MONITORING PREVIEW — Blood · GUT · DNA
+// ─────────────────────────────────────────────────────────
+class _BiomedicalMonitoringPreview extends StatelessWidget {
+  const _BiomedicalMonitoringPreview();
+
+  void _open(BuildContext context, String type) =>
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => BiomedicalMonitoringScreen(type: type)));
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      const Divider(height: 20),
+      BMHHealthRow(label: 'Blood Analysis',
+        value: '', unit: '',
+        signalColor: BMHColors.sCardio,
+        icon: const Icon(Icons.bloodtype_outlined),
+        onTap: () => _open(context, 'Blood')),
+      BMHHealthRow(label: 'GUT Microbiome',
+        value: '', unit: '',
+        signalColor: BMHColors.sGut,
+        icon: const Icon(Icons.spa_outlined),
+        onTap: () => _open(context, 'GUT')),
+      BMHHealthRow(label: 'DNA Insights',
+        value: '', unit: '',
+        signalColor: BMHColors.sDna,
+        icon: const Icon(Icons.biotech_outlined),
+        onTap: () => _open(context, 'DNA')),
+    ]);
+  }
+}

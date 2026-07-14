@@ -83,7 +83,7 @@ class _BodyTrackScreenState extends State<BodyTrackScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     BMHEyebrow('Body composition', showDot: true),
-                    Text('Body Track', style: BMHText.heading1),
+                    Text('Bio Body Track', style: BMHText.heading1),
                   ],
                 )),
                 // Scale status

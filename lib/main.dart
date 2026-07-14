@@ -14,6 +14,45 @@ void main() async {
 
   GoogleFonts.config.allowRuntimeFetching = true;
 
+  // ── GLOBAL ERROR SCREEN ───────────────────────────────
+  // In release mode, an exception inside a widget build used to
+  // show a blank white/grey screen with no way back. This replaces
+  // it with a dark, branded error screen that shows what went
+  // wrong and keeps navigation working.
+  ErrorWidget.builder = (FlutterErrorDetails details) => Material(
+    color: const Color(0xFF02060F),
+    child: SafeArea(child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline_rounded,
+            color: Color(0xFF00c8c8), size: 40),
+          const SizedBox(height: 16),
+          const Text('Something went wrong',
+            style: TextStyle(color: Colors.white, fontSize: 20,
+              fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          const Text(
+            'This screen hit an unexpected error. Please go back '
+            'and try again — and report this message to support:',
+            style: TextStyle(color: Colors.white70, fontSize: 13,
+              height: 1.5)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8)),
+            child: Text(
+              details.exception.toString(),
+              maxLines: 6, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFFff8080),
+                fontSize: 11, fontFamily: 'monospace'))),
+        ]))),
+  );
+
   // ── Initialize services ──────────────────────────────
   BleService.instance;
   await VitalHistoryService.instance.init();

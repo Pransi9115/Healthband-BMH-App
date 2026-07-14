@@ -8,6 +8,7 @@ import '../../core/ble/ble_service.dart';
 import '../../core/health/vital_history_service.dart';
 import '../../core/health/bioscore_calculator.dart';
 import 'live_health_screen.dart';
+import '../../shared/widgets/capsule_wave_measurement.dart';
 
 // ─────────────────────────────────────────────────────────
 //  VITAL CONFIG — ranges, normal values, insights
@@ -357,9 +358,9 @@ class _HealthScreenState extends State<HealthScreen>
                 // TOP BAR
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    BMHEyebrow('Health vitals', showDot: _ble.isBandConnected),
+                    BMHEyebrow('Bio Health Care Band', showDot: _ble.isBandConnected),
                     const SizedBox(height: 4),
-                    Text('Health', style: BMHText.heading1),
+                    Text('Bio Health Care Band', style: BMHText.heading1.copyWith(fontSize: 24)),
                   ]),
                   Flexible(child: Row(mainAxisSize: MainAxisSize.min, children: [
                     // Refresh circle button
@@ -866,11 +867,32 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
   bool get _isBP    => widget.title == 'Blood Pressure';
   bool get _isSleep => widget.title == 'Sleep Quality';
 
-  // Manual-measure vitals (need Measure Now button)
-  bool get _isManual => ['Temperature','HRV','Blood Pressure',
-      'Stress Level','Blood Glucose','Blood Glucose (Manual)'].contains(widget.title);
+  // Measure Now — available on ALL vitals charts EXCEPT Sleep.
+  // (Blood Glucose (Manual) keeps its manual-entry sheet.)
+  bool get _isManual => !_isSleep;
 
   bool get _isManualEntry => widget.title == 'Blood Glucose (Manual)';
+
+  // Teal green for chart axis numbers (bottom times + left counts)
+  static const Color _axisTeal = Color(0xFF2DD4BF);
+
+  // Daily chart zooms to the data's half-hour range (with padding)
+  // instead of always spanning 0–47 — this is what prevents time
+  // labels from ever overlapping.
+  int get _dailyMinX {
+    if (_spots.isEmpty) return 0;
+    final lo = _spots.map((s) => s.x.toInt()).reduce((a, b) => a < b ? a : b);
+    return (lo - 1).clamp(0, 47);
+  }
+
+  int get _dailyMaxX {
+    if (_spots.isEmpty) return 47;
+    final hi = _spots.map((s) => s.x.toInt()).reduce((a, b) => a > b ? a : b);
+    // Ensure a minimum visible span of 4 slots so a single point
+    // doesn't collapse the axis
+    final min = _dailyMinX;
+    return (hi + 1).clamp(min + 4, 47).clamp(0, 47);
+  }
 
   // ── Stats — special handling per vital ───────────────
   String get _statMinLabel  => _isSteps ? 'Total'     : 'MIN';
@@ -926,34 +948,171 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     return BMHPillType.danger;
   }
 
-  // ── Measure Now ───────────────────────────────────────
+  // ── Measure Now — capsule wave modal ──────────────────
+  // The capsule animation runs while the band measures; the
+  // result state is driven ONLY by real value updates coming
+  // back from the band (never by the animation or a fake timer).
+
+  MeasurementType get _capsuleType {
+    switch (widget.title) {
+      case 'Heart Rate':      return MeasurementType.heartRate;
+      case 'SpO₂':            return MeasurementType.spo2;
+      case 'HRV':             return MeasurementType.heartRateVariability;
+      case 'Temperature':     return MeasurementType.skinTemperature;
+      case 'Blood Pressure':  return MeasurementType.bloodPressure;
+      case 'Steps Today':     return MeasurementType.steps;
+      default:                return MeasurementType.glucose; // Stress/Glucose
+    }
+  }
+
+  // Current live value from the band, formatted for display
+  String? get _bandValue {
+    switch (widget.title) {
+      case 'Heart Rate':
+        return _ble.heartRate > 0 ? '${_ble.heartRate}' : null;
+      case 'SpO₂':
+        return _ble.spo2 > 0 ? '${_ble.spo2}' : null;
+      case 'HRV':
+        return _ble.hrv > 0 ? '${_ble.hrv}' : null;
+      case 'Temperature':
+        return _ble.temperature > 0
+            ? _ble.temperature.toStringAsFixed(1) : null;
+      case 'Blood Pressure':
+        return _ble.bpSystolic > 0 ? _ble.bloodPressure : null;
+      case 'Stress Level':
+        return _ble.stressLevel > 0 ? '${_ble.stressLevel}' : null;
+      case 'Steps Today':
+        return _ble.steps > 0 ? '${_ble.steps}' : null;
+      case 'Blood Glucose':
+        return widget.liveValue != '--' ? widget.liveValue : null;
+      default:
+        return null;
+    }
+  }
+
+  // Manual glucose entry (for the 'Blood Glucose (Manual)' chart)
+  void _manualEntryDialog() {
+    int newVal = 100;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: BMHColors.bg3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(BMHRadius.lg)),
+          title: Text('Add Glucose Reading', style: BMHText.heading2),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('$newVal mg/dL',
+              style: BMHText.displaySm.copyWith(
+                color: widget.color, fontSize: 34)),
+            Slider(
+              value: newVal.toDouble(), min: 50, max: 400,
+              activeColor: widget.color,
+              onChanged: (v) => setSt(() => newVal = v.round())),
+            Text('Normal: 70–100 mg/dL (fasting)',
+              style: BMHText.monoSm.copyWith(
+                fontSize: 9, color: BMHColors.inkMute)),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+            TextButton(
+              onPressed: () {
+                _hist.recordAt(_histKey, DateTime.now(), newVal.toDouble());
+                Navigator.pop(ctx);
+              },
+              child: Text('Save',
+                style: TextStyle(color: widget.color))),
+          ])),
+    );
+  }
+
   Future<void> _measureNow() async {
     if (!_ble.isBandConnected || _isMeasuring) return;
     setState(() => _isMeasuring = true);
 
+    // Band measurement command codes (0x2C type parameter).
+    // Blood Pressure uses the HRV measurement (0x01) — the band
+    // returns BP as part of the HRV result packet.
     final typeMap = {
-      'Temperature':    0x04,
+      'Heart Rate':     0x00,
       'HRV':            0x01,
-      'Blood Pressure': 0x56, // uses HRV command which returns BP too
-      'Stress Level':   0x05,
+      'Blood Pressure': 0x01,
       'Blood Glucose':  0x02, // approximation via HR
+      'SpO₂':           0x03,
+      'Temperature':    0x04,
+      'Stress Level':   0x05,
     };
 
-    final type = typeMap[widget.title];
-    if (type != null) {
-      if (widget.title == 'Blood Pressure') {
-        await _ble.startMeasurement(0x56);
-      } else {
-        await _ble.startMeasurement(type);
+    final state    = ValueNotifier(MeasurementState.preparing);
+    final seconds  = ValueNotifier<int?>(null);
+    final value    = ValueNotifier<String?>(null);
+    var cancelled  = false;
+    final baseline = _bandValue;
+    final measureSec =
+        widget.title == 'Temperature' ? 20
+      : widget.title == 'Steps Today' ? 10 : 35;
+
+    Future<void> stopCmd() async {
+      final t = typeMap[widget.title];
+      if (t != null) await _ble.stopMeasurement(t);
+    }
+
+    // Show the capsule modal (not dismissible; Cancel stops the band)
+    // ignore: unawaited_futures
+    showCapsuleMeasurementModal(
+      context: context,
+      type: _capsuleType,
+      state: state,
+      secondsRemaining: seconds,
+      value: value,
+      onCancel: () { cancelled = true; stopCmd(); },
+      onRetry: () { /* modal closes; user taps Measure Now again */ },
+    );
+
+    // Start the band measurement
+    if (typeMap[widget.title] != null) {
+      await _ble.startMeasurement(typeMap[widget.title]!);
+    }
+    // Steps: no measure command — the live stream refreshes it.
+
+    state.value = MeasurementState.measuring;
+    seconds.value = measureSec;
+
+    // Poll the live values the band sends back; complete on a real
+    // update (value changed from baseline), fail on timeout/disconnect.
+    var elapsed = 0;
+    while (elapsed < measureSec && !cancelled && mounted) {
+      await Future.delayed(const Duration(seconds: 1));
+      elapsed++;
+      seconds.value = measureSec - elapsed;
+
+      if (!_ble.isBandConnected) {
+        state.value = MeasurementState.deviceDisconnected;
+        await Future.delayed(const Duration(seconds: 4));
+        break;
       }
-      // Wait for band to measure (15s for temp, 10s for others)
-      final waitSec = widget.title == 'Temperature' ? 15 : 10;
-      await Future.delayed(Duration(seconds: waitSec));
-      if (widget.title != 'Blood Pressure') {
-        await _ble.stopMeasurement(type);
+      final v = _bandValue;
+      // Require a few seconds before accepting, so we don't grab a
+      // stale pre-measurement value the instant the modal opens.
+      if (v != null && elapsed >= 5 && (v != baseline || elapsed >= 12)) {
+        state.value = MeasurementState.processing;
+        await Future.delayed(const Duration(milliseconds: 900));
+        value.value = v;
+        seconds.value = null;
+        state.value = MeasurementState.success;
+        break;
       }
     }
 
+    if (!cancelled &&
+        state.value != MeasurementState.success &&
+        state.value != MeasurementState.deviceDisconnected) {
+      seconds.value = null;
+      state.value = MeasurementState.failed;
+    }
+
+    await stopCmd();
     if (mounted) setState(() => _isMeasuring = false);
   }
 
@@ -1157,29 +1316,33 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                                   interval: (_cfg.maxY - _cfg.minY) / 4,
                                   getTitlesWidget: (v, _) => Text(
                                     v.toStringAsFixed(_cfg.minY % 1 == 0 ? 0 : 1),
-                                    style: BMHText.monoSm.copyWith(fontSize: 8)))),
+                                    style: BMHText.monoSm.copyWith(
+                                      fontSize: 8, color: _axisTeal)))),
                                 bottomTitles: AxisTitles(sideTitles: SideTitles(
-                                  showTitles: true, reservedSize: 22,
+                                  showTitles: true, reservedSize: 24,
                                   interval: 1,
                                   getTitlesWidget: (v, meta) {
                                     if (_range == 0) {
                                       // Daily — x is a half-hour slot (0–47).
-                                      // Labels like 10am, 10:30am. Adaptive
-                                      // thinning: label step grows with the
-                                      // span of data so labels never crowd.
+                                      // The axis is zoomed to the data range
+                                      // (see minX/maxX below), and the label
+                                      // step is chosen so at most ~5 labels
+                                      // are visible — they can never overlap.
                                       final slot = v.round();
-                                      if (slot < 0 || slot > 47) return const SizedBox();
-                                      final xs = _spots.map((s) => s.x.toInt()).toList();
-                                      final span = xs.isEmpty ? 48
-                                          : (xs.reduce((a, b) => a > b ? a : b) -
-                                             xs.reduce((a, b) => a < b ? a : b)) + 1;
-                                      // ≤6 labels on screen: step in half-hours
-                                      final step = span <= 6 ? 1 : span <= 12 ? 2
-                                                 : span <= 24 ? 4 : 8;
-                                      if (slot % step != 0) return const SizedBox();
-                                      return Text(
-                                        VitalHistoryService.halfHourLabel(slot),
-                                        style: BMHText.monoSm.copyWith(fontSize: 7));
+                                      if (slot < _dailyMinX || slot > _dailyMaxX) {
+                                        return const SizedBox();
+                                      }
+                                      final span = _dailyMaxX - _dailyMinX + 1;
+                                      final step = (span / 5).ceil().clamp(1, 12);
+                                      if ((slot - _dailyMinX) % step != 0) {
+                                        return const SizedBox();
+                                      }
+                                      return Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          VitalHistoryService.halfHourLabel(slot),
+                                          style: BMHText.monoSm.copyWith(
+                                            fontSize: 7.5, color: _axisTeal)));
                                     }
                                     if (_range == 1) {
                                       // Weekly — fixed 7 positions 0–6 = MON–SUN
@@ -1187,21 +1350,25 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                                       final idx = v.round();
                                       if (idx < 0 || idx >= labels.length) return const SizedBox();
                                       return Text(labels[idx],
-                                        style: BMHText.monoSm.copyWith(fontSize: 7));
+                                        style: BMHText.monoSm.copyWith(
+                                          fontSize: 7, color: _axisTeal));
                                     }
                                     // Monthly — fixed 4 positions 0–3 = W1–W4
                                     const wLabels = ['W1', 'W2', 'W3', 'W4'];
                                     final idx = v.round();
                                     if (idx < 0 || idx >= wLabels.length) return const SizedBox();
                                     return Text(wLabels[idx],
-                                      style: BMHText.monoSm.copyWith(fontSize: 7));
+                                      style: BMHText.monoSm.copyWith(
+                                        fontSize: 7, color: _axisTeal));
                                   })),
                                 topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                                 rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false))),
                               borderData: FlBorderData(show: false),
                               minY: _cfg.minY, maxY: _cfg.maxY,
-                              minX: 0,
-                              maxX: _range == 0 ? 47 : _range == 1 ? 6 : 3,
+                              minX: _range == 0 ? _dailyMinX.toDouble() : 0,
+                              maxX: _range == 0
+                                  ? _dailyMaxX.toDouble()
+                                  : _range == 1 ? 6 : 3,
                               // Normal range band
                               rangeAnnotations: RangeAnnotations(horizontalRangeAnnotations: [
                                 HorizontalRangeAnnotation(
@@ -1352,20 +1519,22 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
               ]),
             )),
 
-            // ── MEASURE NOW BUTTON (manual vitals only) ──
+            // ── MEASURE NOW BUTTON (all vitals except Sleep) ──
             if (_isManual)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                   BMHSpacing.screenH, 0, BMHSpacing.screenH, 24),
                 child: GestureDetector(
-                  onTap: _ble.isBandConnected ? _measureNow : null,
+                  onTap: _isManualEntry
+                      ? _manualEntryDialog
+                      : (_ble.isBandConnected ? _measureNow : null),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     height: 52,
                     decoration: BoxDecoration(
                       color: _isMeasuring
                           ? widget.color.withOpacity(0.4)
-                          : !_ble.isBandConnected
+                          : (!_ble.isBandConnected && !_isManualEntry)
                               ? BMHColors.bg4
                               : widget.color,
                       borderRadius: BorderRadius.circular(BMHRadius.full),
@@ -1387,17 +1556,22 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                             style: BMHText.labelLg.copyWith(
                               color: BMHColors.bg0)),
                         ] else ...[
-                          Icon(Icons.monitor_heart_outlined,
-                            color: _ble.isBandConnected
+                          Icon(
+                            _isManualEntry
+                                ? Icons.edit_note_rounded
+                                : Icons.monitor_heart_outlined,
+                            color: (_ble.isBandConnected || _isManualEntry)
                                 ? BMHColors.bg0 : BMHColors.inkMute,
                             size: 18),
                           const SizedBox(width: 8),
                           Text(
-                            _ble.isBandConnected
-                                ? 'Measure Now'
-                                : 'Band not connected',
+                            _isManualEntry
+                                ? 'Add Reading'
+                                : _ble.isBandConnected
+                                    ? 'Measure Now'
+                                    : 'Band not connected',
                             style: BMHText.labelLg.copyWith(
-                              color: _ble.isBandConnected
+                              color: (_ble.isBandConnected || _isManualEntry)
                                   ? BMHColors.bg0 : BMHColors.inkMute)),
                         ],
                       ]))))
@@ -1810,13 +1984,15 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
                   final i = v.round();
                   if (i < 0 || i >= labels.length) return const SizedBox();
                   return Text(labels[i],
-                    style: BMHText.monoSm.copyWith(fontSize: 7));
+                    style: BMHText.monoSm.copyWith(fontSize: 7,
+                      color: const Color(0xFF2DD4BF)));
                 })),
               leftTitles: AxisTitles(sideTitles: SideTitles(
                 showTitles: true, reservedSize: 24,
                 getTitlesWidget: (v, _) => Text(
                   v.toInt().toString(),
-                  style: BMHText.monoSm.copyWith(fontSize: 7)))),
+                  style: BMHText.monoSm.copyWith(fontSize: 7,
+                    color: const Color(0xFF2DD4BF))))),
               topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
               rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false))),
             gridData: FlGridData(show: true,

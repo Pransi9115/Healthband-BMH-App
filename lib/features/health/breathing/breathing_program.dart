@@ -40,8 +40,9 @@ class BreathingProgram {
       inhaleSeconds + holdSeconds + exhaleSeconds + restSeconds;
 
   int getCyclesForDuration(int minutes) {
+    final cycle = cycleDurationSeconds > 0 ? cycleDurationSeconds : 1;
     int totalSeconds = minutes * 60;
-    return (totalSeconds / cycleDurationSeconds).floor();
+    return (totalSeconds / cycle).floor();
   }
 
   static const List<BreathingProgram> allPrograms = [
@@ -114,7 +115,8 @@ class BreathingProgram {
   ];
 
   static BreathingProgram getById(String id) {
-    return allPrograms.firstWhere((p) => p.id == id);
+    return allPrograms.firstWhere((p) => p.id == id,
+        orElse: () => allPrograms.first);
   }
 }
 
@@ -141,7 +143,9 @@ class BreathingSession {
   int get totalSeconds => durationMinutes * 60;
   int get remainingSeconds => (totalSeconds - elapsedSeconds).clamp(0, totalSeconds);
   bool get isComplete => remainingSeconds == 0;
-  int get progressPercent => ((elapsedSeconds / totalSeconds) * 100).toInt().clamp(0, 100);
+  int get progressPercent => totalSeconds <= 0
+      ? 0
+      : ((elapsedSeconds / totalSeconds) * 100).toInt().clamp(0, 100);
 
   String get programName => BreathingProgram.getById(programId).name;
 }

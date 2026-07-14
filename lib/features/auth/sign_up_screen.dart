@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_screen.dart';
@@ -29,6 +30,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Future<void> _next() async {
     if (_step == 0) { setState(() => _step = 1); return; }
     setState(() => _loading = true);
+
+    // Save the user's name — used by the Home greeting and Profile
+    final name = _nameCtrl.text.trim();
+    if (name.isNotEmpty) {
+      final p = await SharedPreferences.getInstance();
+      await p.setString('profile_name', name);
+    }
+
     await Future.delayed(const Duration(milliseconds: 1400));
     if (!mounted) return;
     setState(() => _loading = false);

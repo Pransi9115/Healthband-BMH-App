@@ -23,7 +23,7 @@ class BMHGlobalNav extends StatelessWidget {
 
   static const _items = [
     (Icons.home_rounded, Icons.home_outlined, 'Home'),
-    (Icons.monitor_heart_rounded, Icons.monitor_heart_outlined, 'Health'),
+    (Icons.monitor_heart_rounded, Icons.monitor_heart_outlined, 'Bio Health\nCare Band'),
     (Icons.self_improvement_rounded, Icons.self_improvement_outlined, 'Wellness'),
     (Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
   ];
@@ -52,33 +52,33 @@ class BMHGlobalNav extends StatelessWidget {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeInOut,
-                  padding: active
-                      ? const EdgeInsets.symmetric(horizontal: 14, vertical: 8)
-                      : const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: active ? _teal : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Row(
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         active ? item.$1 : item.$2,
-                        color: active ? Colors.white : Colors.white.withOpacity(0.3),
+                        color: active ? Colors.white : Colors.white.withOpacity(0.4),
                         size: 22,
                       ),
-                      if (active) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          item.$3,
-                          style: const TextStyle(
-                            fontFamily: 'Plus Jakarta Sans',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.$3,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        style: TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 10,
+                          fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                          color: active
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.45),
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ),

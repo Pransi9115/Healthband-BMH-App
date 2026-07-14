@@ -661,7 +661,7 @@ class _WomensBiocareScreenState extends State<WomensBiocareScreen>
                                   Text(cat.subtitle,
                                     style: BMHText.monoSm.copyWith(
                                       fontSize: 9,
-                                      color: BMHColors.inkMute)),
+                                      color: Colors.white)),
                                 ])),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -807,7 +807,7 @@ class _ExerciseRowState extends State<_ExerciseRow>
             Text(widget.exercise.name, style: BMHText.labelMd),
             Text(widget.exercise.muscleGroup,
               style: BMHText.monoSm.copyWith(
-                fontSize: 8, color: BMHColors.inkMute)),
+                fontSize: 8, color: Colors.white)),
           ])),
           Text('${widget.exercise.sets}×${widget.exercise.reps}',
             style: BMHText.monoSm.copyWith(

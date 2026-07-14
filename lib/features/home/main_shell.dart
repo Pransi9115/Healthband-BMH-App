@@ -167,7 +167,7 @@ class _BodyScreenState extends State<_BodyScreen>
                                     children: const [
                                       TextSpan(text: 'View '),
                                       TextSpan(
-                                        text: 'Body Track',
+                                        text: 'Bio Body Track',
                                         style: TextStyle(
                                           fontStyle: FontStyle.italic,
                                           color: BMHColors.sGut,

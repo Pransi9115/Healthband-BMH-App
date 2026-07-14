@@ -83,7 +83,10 @@ class _BreathingSessionScreenState extends State<BreathingSessionScreen>
     final program = BreathingProgram.getById(widget.session.programId);
     
     // Calculate which part of the cycle we're in based on REAL elapsed time
-    final elapsedInCurrentCycle = widget.session.elapsedSeconds % program.cycleDurationSeconds;
+    final cycleLen = program.cycleDurationSeconds > 0
+        ? program.cycleDurationSeconds : 1;
+    final elapsedInCurrentCycle =
+        widget.session.elapsedSeconds % cycleLen;
 
     String phase;
     int countdown;
@@ -107,7 +110,7 @@ class _BreathingSessionScreenState extends State<BreathingSessionScreen>
     _phaseCountdown = countdown.clamp(0, 99);
     
     // Also sync animation to real time for smooth visual
-    final normalizedPosition = elapsedInCurrentCycle / program.cycleDurationSeconds;
+    final normalizedPosition = elapsedInCurrentCycle / cycleLen;
     if (_isRunning && !_isPaused) {
       _animationController.animateTo(
         normalizedPosition.clamp(0.0, 1.0),
@@ -121,8 +124,10 @@ class _BreathingSessionScreenState extends State<BreathingSessionScreen>
       _isRunning = !_isRunning;
       if (_isRunning) {
         final program = BreathingProgram.getById(widget.session.programId);
-        final elapsedInCycle = widget.session.elapsedSeconds % program.cycleDurationSeconds;
-        final normalizedPos = elapsedInCycle / program.cycleDurationSeconds;
+        final cl = program.cycleDurationSeconds > 0
+            ? program.cycleDurationSeconds : 1;
+        final elapsedInCycle = widget.session.elapsedSeconds % cl;
+        final normalizedPos = elapsedInCycle / cl;
         _animationController.animateTo(normalizedPos, duration: const Duration(milliseconds: 100));
       } else {
         _animationController.stop();
@@ -144,8 +149,10 @@ class _BreathingSessionScreenState extends State<BreathingSessionScreen>
       _isRunning = true;
       _isPaused = false;
       final program = BreathingProgram.getById(widget.session.programId);
-      final elapsedInCycle = widget.session.elapsedSeconds % program.cycleDurationSeconds;
-      final normalizedPos = elapsedInCycle / program.cycleDurationSeconds;
+      final cl = program.cycleDurationSeconds > 0
+          ? program.cycleDurationSeconds : 1;
+      final elapsedInCycle = widget.session.elapsedSeconds % cl;
+      final normalizedPos = elapsedInCycle / cl;
       
       // Continue animation from current position
       _animationController.animateTo(
@@ -197,7 +204,15 @@ class _BreathingSessionScreenState extends State<BreathingSessionScreen>
         elevation: 0,
         centerTitle: true,
         leading: GestureDetector(
-          onTap: _stopSession,
+          onTap: () {
+            // Back behaviour: if the session barely started, just go
+            // back; otherwise end the session and show results.
+            if (!_isRunning && widget.session.elapsedSeconds < 10) {
+              Navigator.pop(context);
+            } else {
+              _stopSession();
+            }
+          },
           child: Container(
             margin: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -205,7 +220,7 @@ class _BreathingSessionScreenState extends State<BreathingSessionScreen>
               shape: BoxShape.circle,
               border: Border.all(color: BMHColors.line),
             ),
-            child: const Icon(Icons.close_rounded, size: 14, color: BMHColors.ink),
+            child: const Icon(Icons.arrow_back_rounded, size: 14, color: BMHColors.ink),
           ),
         ),
         title: Text('💨 ${program.name}',
