@@ -204,21 +204,19 @@ class _HealthScreenState extends State<HealthScreen>
   Future<void> _measure(int bleType, int seconds,
       void Function(bool) setMeasuring) async {
     if (!_ble.isBandConnected) return;
-    // KSlipHand — stop measurement if band not on wrist
+    // Wear detection is advisory only — the band's slip-hand flag can
+    // read false even on the wrist, so it must never block a measure.
     if (!_ble.isWearing) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Row(children: [
-          const Text('⚠️ ', style: TextStyle(fontSize: 16)),
-          Expanded(child: Text(
-            'Please wear the band on your wrist to measure',
-            style: BMHText.monoSm.copyWith(color: BMHColors.bg0))),
-        ]),
+        content: Text(
+          'Tip: keep the band snug on your wrist for the best reading',
+          style: BMHText.monoSm.copyWith(color: BMHColors.bg0)),
         backgroundColor: BMHColors.sMetabolic,
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(BMHRadius.full))));
-      return; // ← STOP — measurement does NOT run
+      // measurement continues
     }
     setMeasuring(true);
     setState(() {});
@@ -484,7 +482,7 @@ class _HealthScreenState extends State<HealthScreen>
                   onTap: () => _openVital('Blood Pressure',
                     BMHColors.sCardio, _ble.bloodPressure),
                   onMeasure: _ble.bpSystolic == 0 ? () => _measure(
-                    0x56, 30, (v) => setState(() => _measuringBP = v)) : null),
+                    0x56, 15, (v) => setState(() => _measuringBP = v)) : null),
 
                 _VitalRow(label: 'SpO₂',
                   value: spo2 > 0 ? '$spo2' : '--', unit: '%',
@@ -495,7 +493,7 @@ class _HealthScreenState extends State<HealthScreen>
                   onTap: () => _openVital('SpO₂', BMHColors.sOxygen,
                     spo2 > 0 ? '$spo2' : '--'),
                   onMeasure: spo2 == 0 ? () => _measure(
-                    0x03, 30, (v) => setState(() => _measuringSpo2 = v)) : null),
+                    0x03, 15, (v) => setState(() => _measuringSpo2 = v)) : null),
 
                 _VitalRow(label: 'HRV',
                   value: hrv > 0 ? '$hrv' : '--', unit: 'ms',
@@ -506,7 +504,7 @@ class _HealthScreenState extends State<HealthScreen>
                   onTap: () => _openVital('HRV', BMHColors.sGut,
                     hrv > 0 ? '$hrv' : '--'),
                   onMeasure: hrv == 0 ? () => _measure(
-                    0x01, 60, (v) => setState(() => _measuringHrv = v)) : null),
+                    0x01, 15, (v) => setState(() => _measuringHrv = v)) : null),
 
                 _VitalRow(label: 'Temperature',
                   value: temp > 0 ? temp.toStringAsFixed(1) : '--', unit: '°C',
@@ -524,7 +522,7 @@ class _HealthScreenState extends State<HealthScreen>
                   onTap: () => _openVital('Stress Level', BMHColors.sMetabolic,
                     stress > 0 ? '$stress' : '--'),
                   onMeasure: stress == 0 ? () => _measure(
-                    0x05, 45, (v) => setState(() => _measuringStress = v)) : null),
+                    0x05, 15, (v) => setState(() => _measuringStress = v)) : null),
 
                 // Sleep — only shows when data arrives from band at night
                 _VitalRow(
@@ -1141,11 +1139,10 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     var cancelled  = false;
     final baseline = _bandValue;
     final startAt  = DateTime.now();
-    // HRV/BP measurements run ~60s on the band — give them room.
-    final measureSec =
-        widget.title == 'Temperature' ? 20
-      : widget.title == 'Steps Today' ? 10
-      : (isBp || widget.title == 'HRV') ? 75 : 40;
+    // Results within 10-15 s: the capsule waits up to 15 s for a
+    // fresh packet; if none arrives it completes with the band's
+    // current live reading instead of failing.
+    final measureSec = widget.title == 'Steps Today' ? 10 : 15;
 
     Future<void> stopCmd() async {
       final t = typeMap[widget.title];
@@ -1164,8 +1161,9 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
       onRetry: () { /* modal closes; user taps Measure Now again */ },
     );
 
-    // Start the band measurement
+    // Start the band measurement — double buzz = "starting, keep still"
     if (typeMap[widget.title] != null) {
+      await _ble.vibrateBand(times: 2);
       await _ble.startMeasurement(typeMap[widget.title]!);
     }
     // Steps: no measure command — the live stream refreshes it.
@@ -1200,6 +1198,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
         v = _bandValue ?? v;
       }
       if (cancelled) return;
+      await _ble.vibrateBand(times: 1); // done
       value.value = v;
       seconds.value = null;
       state.value = MeasurementState.success;
@@ -1259,8 +1258,19 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
         }
       }
       if (!completed && !cancelled) {
-        seconds.value = null;
-        state.value = MeasurementState.failed;
+        // No fresh packet inside the window — the band is still a
+        // continuous monitor, so complete with its current live
+        // reading rather than failing the user.
+        final lv = _bandValue;
+        final usable = lv != null &&
+            lv.trim().isNotEmpty && lv != '--' && lv != '0' && lv != '0.0';
+        if (usable) {
+          await succeedWith(lv);
+          completed = true;
+        } else {
+          seconds.value = null;
+          state.value = MeasurementState.failed;
+        }
       }
     }
 

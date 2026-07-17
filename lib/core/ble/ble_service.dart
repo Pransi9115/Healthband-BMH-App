@@ -136,6 +136,22 @@ class BleService extends ChangeNotifier {
   int      _slipHandZeroCount = 0;
   int    _bpSystolic  = 0;
   int    _bpDiastolic = 0;
+  // BP smoothing — wrist-optical BP is re-estimated on every reading,
+  // so single values naturally wobble. We display the median of the
+  // last 3 readings, which keeps the number clinically steady.
+  final List<int> _bpSysHist = [];
+  final List<int> _bpDiaHist = [];
+  void _setBp(int sys, int dia) {
+    _bpSysHist.add(sys);
+    _bpDiaHist.add(dia);
+    if (_bpSysHist.length > 3) {
+      _bpSysHist.removeAt(0);
+      _bpDiaHist.removeAt(0);
+    }
+    List<int> sorted(List<int> l) => List<int>.from(l)..sort();
+    _bpSystolic = sorted(_bpSysHist)[_bpSysHist.length ~/ 2];
+    _bpDiastolic = sorted(_bpDiaHist)[_bpDiaHist.length ~/ 2];
+  }
   int    _stepGoal    = 5000;
   int    _vitalAge    = 0;
   BMHSleepData? _lastSleep;
@@ -1248,7 +1264,7 @@ class BleService extends ChangeNotifier {
                 if (hrv > 0 && hrv < 300)    _hrv = hrv;
                 if (stress > 0 && stress <= 100) _stressLevel = stress;
                 if (sys > 60 && sys < 200 && dia > 40 && dia < 130) {
-                  _bpSystolic = sys; _bpDiastolic = dia;
+                  _setBp(sys, dia);
                 }
                 final dt56 = _parseDate(d, base + 3);
                 if (dt56 != null) {
@@ -1264,7 +1280,7 @@ class BleService extends ChangeNotifier {
               if (d.length >= 13) { final st = d[12] & 0xff; if (st > 0 && st <= 100) _stressLevel = st; }
               if (d.length >= 15) {
                 final sys = d[13] & 0xff; final dia = d[14] & 0xff;
-                if (sys > 60 && sys < 200 && dia > 40 && dia < 130) { _bpSystolic = sys; _bpDiastolic = dia; }
+                if (sys > 60 && sys < 200 && dia > 40 && dia < 130) { _setBp(sys, dia); }
               }
             }
             if (isEnd56) _endHistory(_HRV);
@@ -1393,7 +1409,7 @@ class BleService extends ChangeNotifier {
                 _wearProbeReceived = true;
                 if (slipHand == 0x00) {
                   _slipHandZeroCount++;
-                  if (_slipHandZeroCount >= 3) {
+                  if (_slipHandZeroCount >= 5) {
                     // 3 consecutive not-wearing readings — genuinely removed
                     _isWearing = false;
                     _slipHandZeroCount = 0;
@@ -1605,7 +1621,7 @@ class BleService extends ChangeNotifier {
         _connectedBand = null; _writeChar = null;
         _heartRate = 0; _spo2 = 0; _temperature = 0;
         _steps = 0; _battery = 0; _hrv = 0;
-        _stressLevel = 0; _bpSystolic = 0; _bpDiastolic = 0;
+        _stressLevel = 0; _bpSystolic = 0; _bpDiastolic = 0; _bpSysHist.clear(); _bpDiaHist.clear();
         _calories = 0; _distance = 0; _exerciseMin = 0;
         _isWearing          = false;
         _wearAsked          = false;
