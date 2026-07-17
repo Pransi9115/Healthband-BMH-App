@@ -731,6 +731,10 @@ class BleService extends ChangeNotifier {
         const Duration(seconds: 10), (_) async {
         if (!isBandConnected || _writeChar == null) return;
         _measureTick++;
+        // Refresh battery every ~5 min so the UI stays truthful
+        if (_measureTick % 30 == 0) {
+          await _write(_cmd([_BATTERY]));
+        }
         switch (_measureTick % 8) {
           case 1: // SpO2 manual
             await _write(_cmd([_BLOOD_O2, 0x00]));
@@ -944,6 +948,16 @@ class BleService extends ChangeNotifier {
     return _cmd([_SET_TIME,
       bcd(n.year % 100), bcd(n.month), bcd(n.day),
       bcd(n.hour), bcd(n.minute), bcd(n.second)]);
+  }
+
+  /// Buzz the band's motor [times] times (SDK CMD_Set_MOT_SIGN 0x36).
+  /// Used to signal "measurement starting / finished" like a clinical
+  /// device would.
+  Future<void> vibrateBand({int times = 2}) async {
+    if (!isBandConnected || _writeChar == null) return;
+    try {
+      await _write(_cmd([0x36, times & 0xff]));
+    } catch (_) {}
   }
 
   Future<void> startMeasurement(int type) async {

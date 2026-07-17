@@ -223,6 +223,8 @@ class _HealthScreenState extends State<HealthScreen>
     setMeasuring(true);
     setState(() {});
     _seconds = seconds;
+    // Clinical-device feel: double buzz = "measurement starting"
+    await _ble.vibrateBand(times: 2);
     await _ble.startMeasurement(bleType);
     _measureTimer?.cancel();
     _measureTimer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -231,6 +233,7 @@ class _HealthScreenState extends State<HealthScreen>
       if (_seconds <= 0) {
         t.cancel();
         _ble.stopMeasurement(bleType);
+        _ble.vibrateBand(times: 1); // single buzz = "done"
         setMeasuring(false);
         _seconds = 0;
       }
@@ -363,6 +366,45 @@ class _HealthScreenState extends State<HealthScreen>
                     Text('Bio Band', style: BMHText.heading1),
                   ]),
                   Flexible(child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    // Band battery — medical-device status chip
+                    if (_ble.isBandConnected && _ble.battery > 0) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: BMHColors.surface,
+                          borderRadius:
+                              BorderRadius.circular(BMHRadius.full),
+                          border: Border.all(color: BMHColors.line),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(
+                            _ble.battery > 70
+                                ? Icons.battery_full_rounded
+                                : _ble.battery > 50
+                                    ? Icons.battery_5_bar_rounded
+                                    : _ble.battery > 20
+                                        ? Icons.battery_3_bar_rounded
+                                        : Icons.battery_alert_rounded,
+                            size: 14,
+                            color: _ble.battery > 50
+                                ? BMHColors.success
+                                : _ble.battery > 20
+                                    ? BMHColors.warn
+                                    : BMHColors.danger,
+                          ),
+                          const SizedBox(width: 4),
+                          Text('${_ble.battery}%',
+                              style: BMHText.monoSm.copyWith(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: _ble.battery > 20
+                                      ? BMHColors.ink
+                                      : BMHColors.danger)),
+                        ]),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     // Refresh circle button
                     if (_ble.isBandConnected)
                       GestureDetector(
@@ -860,6 +902,30 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
   VitalConfig get _cfg => VitalConfig.of(widget.title, widget.color);
   String get _histKey => VitalHistoryService.keyFor(widget.title);
   List<FlSpot> get _spots => _hist.getSpots(_histKey, _range);
+
+  /// What the chart actually draws. On the DAILY range we never make
+  /// the user wait: a single saved bucket renders as a reading with a
+  /// short guide line, and if nothing is saved yet but the band shows
+  /// a live value, the chart seeds itself from that live reading.
+  List<FlSpot> get _drawSpots {
+    final raw = _spots;
+    if (_range != 0 || raw.length >= 2) return raw;
+    if (raw.length == 1) {
+      final s0 = raw.first;
+      final x0 = s0.x > 0 ? s0.x - 1 : s0.x + 1;
+      return s0.x > 0 ? [FlSpot(x0, s0.y), s0] : [s0, FlSpot(x0, s0.y)];
+    }
+    // raw is empty — try the live value
+    final lv = double.tryParse(
+        widget.liveValue.replaceAll(RegExp(r'[^0-9.]'), ''));
+    if (lv == null || lv <= 0) return raw;
+    final now = DateTime.now();
+    final slot = (now.hour * 2 + now.minute ~/ 30).toDouble();
+    final x0 = slot > 0 ? slot - 1 : slot + 1;
+    return slot > 0
+        ? [FlSpot(x0, lv), FlSpot(slot, lv)]
+        : [FlSpot(slot, lv), FlSpot(x0, lv)];
+  }
   List<String> get _labels => _hist.getLabels(_histKey, _range);
   String get _periodLabel => _hist.getPeriodLabel(_range);
 
@@ -1374,7 +1440,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                     const SizedBox(height: 14),
                     SizedBox(
                       height: 160,
-                      child: _spots.length < 2
+                      child: _drawSpots.length < 2
                           ? Center(child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -1462,7 +1528,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                                   color: widget.color.withOpacity(0.06)),
                               ]),
                               lineBarsData: [LineChartBarData(
-                                spots: _spots, isCurved: true,
+                                spots: _drawSpots, isCurved: true,
                                 color: widget.color, barWidth: 2,
                                 isStrokeCapRound: true,
                                 dotData: FlDotData(show: true,
