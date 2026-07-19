@@ -1,0 +1,153 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'shared/theme/bmh_theme.dart';
+import 'features/auth/splash_screen.dart';
+import 'core/ble/ble_service.dart';
+import 'core/health/vital_history_service.dart';
+import 'core/health/health_service.dart';
+import 'core/diet/diet_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  GoogleFonts.config.allowRuntimeFetching = true;
+
+  // ── GLOBAL ERROR SCREEN ───────────────────────────────
+  // In release mode, an exception inside a widget build used to
+  // show a blank white/grey screen with no way back. This replaces
+  // it with a dark, branded error screen that shows what went
+  // wrong and keeps navigation working.
+  ErrorWidget.builder = (FlutterErrorDetails details) => Material(
+    color: const Color(0xFF02060F),
+    child: SafeArea(child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline_rounded,
+            color: Color(0xFF00c8c8), size: 40),
+          const SizedBox(height: 16),
+          const Text('Something went wrong',
+            style: TextStyle(color: Colors.white, fontSize: 20,
+              fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          const Text(
+            'This screen hit an unexpected error. Please go back '
+            'and try again — and report this message to support:',
+            style: TextStyle(color: Colors.white70, fontSize: 13,
+              height: 1.5)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8)),
+            child: Text(
+              details.exception.toString(),
+              maxLines: 6, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFFff8080),
+                fontSize: 11, fontFamily: 'monospace'))),
+        ]))),
+  );
+
+  // ── Initialize services ──────────────────────────────
+  BleService.instance;
+  await VitalHistoryService.instance.init();
+  await DietService.instance.init(); // diet log persistence
+
+  // ── Request permissions on iOS at startup ────────────
+  // This makes all permissions appear in iOS Settings
+  // (same as JCVital / Fitdays behaviour)
+  if (Platform.isIOS) {
+    await _requestiOSPermissions();
+    }
+
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Color(0xFF02060F),
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
+  runApp(const BMHApp());
+}
+
+// ── iOS Permission Request ────────────────────────────
+// Called once on first launch — shows iOS permission dialogs
+// and registers all permissions in iOS Settings.
+// Small delays between requests ensure iOS processes each
+// dialog before the next one is triggered.
+Future<void> _requestiOSPermissions() async {
+  // Step 1 — Bluetooth (most important for BMH)
+  await Permission.bluetooth.request();
+  await Permission.bluetoothConnect.request();
+  await Permission.bluetoothScan.request();
+  await Future.delayed(const Duration(milliseconds: 200));
+
+  // Step 2 — Location (required for BLE scanning on iOS)
+  // Request WhenInUse first, then upgrade to Always so that
+  // iOS Settings shows the full Location row with "Always".
+  await Permission.locationWhenInUse.request();
+  await Future.delayed(const Duration(milliseconds: 200));
+  await Permission.locationAlways.request();
+  await Future.delayed(const Duration(milliseconds: 200));
+
+  // Step 3 — Motion & Fitness (for step counting)
+  await Permission.sensors.request();
+  await Future.delayed(const Duration(milliseconds: 200));
+
+  // Step 4 — Camera (for QR pairing)
+  await Permission.camera.request();
+  await Future.delayed(const Duration(milliseconds: 200));
+
+  // Step 5 — Notifications (for daily check-in reminder)
+  await Permission.notification.request();
+}
+
+class BMHApp extends StatefulWidget {
+  const BMHApp({super.key});
+  @override
+  State<BMHApp> createState() => _BMHAppState();
+}
+
+class _BMHAppState extends State<BMHApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Timers freeze while backgrounded — the moment the app is
+    // visible again, re-establish the band link if it dropped.
+    if (state == AppLifecycleState.resumed) {
+      BleService.instance.onAppResumed();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'BioMedical Healthcare',
+      debugShowCheckedModeBanner: false,
+      theme: BMHTheme.dark,
+      darkTheme: BMHTheme.dark,
+      themeMode: ThemeMode.dark,
+      home: const SplashScreen(),
+    );
+  }
+}
