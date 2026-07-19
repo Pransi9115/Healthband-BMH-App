@@ -428,7 +428,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   late final List<Widget> _screens = [
     const _KeepAlive(child: HomeScreen()),
-    const _KeepAlive(child: HealthScreen()),
+    const _KeepAlive(child: HealthScreen(embedded: true)),  // MainShell owns the nav bar
     const _KeepAlive(child: WellnessScreen()),
     const _KeepAlive(child: ProfileScreen()),
   ];
@@ -437,7 +437,10 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF080f1e),
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      // BMHNavScope tells any nested BMHGlobalNav that a bar is already
+      // on screen, so tab screens can't accidentally draw a second one.
+      body: BMHNavScope(
+        child: IndexedStack(index: _currentIndex, children: _screens)),
       extendBody: true,
       bottomNavigationBar: BMHGlobalNav(activeIndex: _currentIndex),
     );

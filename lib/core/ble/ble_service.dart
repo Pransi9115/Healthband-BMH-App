@@ -141,6 +141,15 @@ class BleService extends ChangeNotifier {
   // BP smoothing — wrist-optical BP is re-estimated on every reading,
   // so single values naturally wobble. We display the median of the
   // last 3 readings, which keeps the number clinically steady.
+  // Scratch state used while parsing a 0x56 history batch — holds the
+  // newest record so only that one reaches the live display.
+  DateTime? _newest56;
+  int _newestHrv56 = 0, _newestStr56 = 0, _newestSys56 = 0, _newestDia56 = 0;
+  DateTime? _newestHrAt;
+  int _newestHr = 0;
+  DateTime? _newestO2At;
+  int _newestO2 = 0;
+
   final List<int> _bpSysHist = [];
   final List<int> _bpDiaHist = [];
   void _setBp(int sys, int dia) {
@@ -1268,10 +1277,20 @@ class BleService extends ChangeNotifier {
                   if (h > 30 && h < 220) {
                     final readingTime = dt.add(Duration(minutes: j * 5));
                     hist.recordAt('heart_rate', readingTime, h.toDouble());
-                    _heartRate = h;
+                    // Same fix as blood pressure: history records must
+                    // not drive the live number. Keep only the newest.
+                    if (_newestHrAt == null ||
+                        readingTime.isAfter(_newestHrAt!)) {
+                      _newestHrAt = readingTime;
+                      _newestHr   = h;
+                    }
                   }
                 }
               }
+              // Apply only the newest reading to the live display.
+              if (_newestHr > 30 && _newestHr < 220) _heartRate = _newestHr;
+              _newestHrAt = null;
+              _newestHr = 0;
             }
 
             if (isEnd) {
@@ -1304,19 +1323,44 @@ class BleService extends ChangeNotifier {
                 final stress = d[base + 12] & 0xff;
                 final sys    = d[base + 13] & 0xff;
                 final dia    = d[base + 14] & 0xff;
-                if (hrv > 0 && hrv < 300)    _hrv = hrv;
-                if (stress > 0 && stress <= 100) _stressLevel = stress;
-                if (sys > 60 && sys < 200 && dia > 40 && dia < 130) {
-                  _setBp(sys, dia);
-                }
                 final dt56 = _parseDate(d, base + 3);
+
+                // FIX — the BP "flicker".
+                //
+                // Every record in this loop used to be pushed straight
+                // into the LIVE display via _setBp() / _hrv / _stress.
+                // A history packet carries many old records, so syncing
+                // replayed hours-old readings through the live value one
+                // after another — the number visibly jumped around, then
+                // snapped back as soon as the next live packet arrived.
+                //
+                // History belongs in VitalHistoryService. The live value
+                // is only updated from the NEWEST record in the batch.
                 if (dt56 != null) {
                   if (hrv > 0)    hist56.recordAt('hrv',            dt56, hrv.toDouble());
                   if (stress > 0) hist56.recordAt('stress',         dt56, stress.toDouble());
                   if (sys > 60)   hist56.recordAt('blood_pressure', dt56, sys.toDouble());
                   if (dia > 40)   hist56.recordAt('bp_diastolic',   dt56, dia.toDouble());
                 }
+
+                // Track the most recent record seen in this batch.
+                if (dt56 == null || _newest56 == null || dt56.isAfter(_newest56!)) {
+                  _newest56    = dt56;
+                  _newestHrv56 = hrv;
+                  _newestStr56 = stress;
+                  _newestSys56 = sys;
+                  _newestDia56 = dia;
+                }
               }
+              // Apply ONLY the newest record to the live display.
+              if (_newestHrv56 > 0 && _newestHrv56 < 300) _hrv = _newestHrv56;
+              if (_newestStr56 > 0 && _newestStr56 <= 100) _stressLevel = _newestStr56;
+              if (_newestSys56 > 60 && _newestSys56 < 200 &&
+                  _newestDia56 > 40 && _newestDia56 < 130) {
+                _setBp(_newestSys56, _newestDia56);
+              }
+              _newest56 = null;
+              _newestHrv56 = _newestStr56 = _newestSys56 = _newestDia56 = 0;
             } else {
               // Short live packet
               if (d.length >= 10) { final hrv = d[9] & 0xff; if (hrv > 0 && hrv < 300) _hrv = hrv; }
@@ -1346,12 +1390,20 @@ class BleService extends ChangeNotifier {
                 if (base + recSize60 > d.length) break;
                 final o = d[base + 9] & 0xff;
                 if (o > 60 && o <= 100) {
-                  _spo2 = o;
                   final dt60 = _parseDate(d, base + 3);
                   if (dt60 != null) hist60.recordAt('spo2', dt60, o.toDouble());
                   else hist60.record('spo2', o.toDouble());
+                  // Newest record only — see the BP fix above.
+                  if (dt60 == null || _newestO2At == null ||
+                      dt60.isAfter(_newestO2At!)) {
+                    _newestO2At = dt60;
+                    _newestO2   = o;
+                  }
                 }
               }
+              if (_newestO2 > 60 && _newestO2 <= 100) _spo2 = _newestO2;
+              _newestO2At = null;
+              _newestO2 = 0;
             } else {
               // Short packet
               for (int i = 1; i < d.length; i++) {

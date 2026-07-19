@@ -9,6 +9,7 @@ import '../../core/health/vital_history_service.dart';
 import '../../core/health/bioscore_calculator.dart';
 import '../../core/health/vital_status.dart';
 import '../../core/health/sleep_analyzer.dart';
+import 'sleep_calibration_screen.dart';
 import 'live_health_screen.dart';
 import '../../shared/widgets/capsule_wave_measurement.dart';
 
@@ -149,7 +150,14 @@ class VitalConfig {
 //  HEALTH SCREEN
 // ─────────────────────────────────────────────────────────
 class HealthScreen extends StatefulWidget {
-  const HealthScreen({super.key});
+  /// True when this screen is rendered INSIDE MainShell's IndexedStack.
+  /// MainShell already supplies the global nav bar, so the screen must
+  /// not add a second one — that produced two stacked tab bars.
+  /// False when pushed as its own route, where it needs its own nav
+  /// and a back button.
+  final bool embedded;
+
+  const HealthScreen({super.key, this.embedded = false});
   @override
   State<HealthScreen> createState() => _HealthScreenState();
 }
@@ -344,16 +352,17 @@ class _HealthScreenState extends State<HealthScreen>
     final hrv  = _ble.hrv;
     final stress = _ble.stressLevel;
 
-    // FIX: this Scaffold previously had NO bottomNavigationBar and no
-    // back affordance. It inherits nav from MainShell when shown as a
-    // tab, but had neither when pushed as a route — which is why the
-    // Health Vitals page could appear with no way back and no tabs.
-    // Declaring it here makes the screen self-sufficient in both cases.
-    final canPop = Navigator.of(context).canPop();
+    // Nav ownership:
+    //  • embedded in MainShell  -> MainShell draws the nav, we must not
+    //  • pushed as a route      -> we draw our own nav + back button
+    // Getting this wrong is what caused the duplicated tab bar.
+    final standalone = !widget.embedded;
+    final canPop = standalone && Navigator.of(context).canPop();
 
     return Scaffold(
       backgroundColor: BMHColors.bg0,
-      bottomNavigationBar: const BMHGlobalNav(activeIndex: 1),
+      bottomNavigationBar:
+          standalone ? const BMHGlobalNav(activeIndex: 1) : null,
       body: Stack(children: [
         Positioned(top: -100, right: -100,
           child: Container(width: 350, height: 350,
@@ -2314,6 +2323,13 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
                     showDot: _ble.isBandConnected),
                   Text('Sleep Quality', style: BMHText.heading1),
                 ])),
+                // Raw-data screen for calibrating sleep staging.
+                BMHIconButton(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const SleepCalibrationScreen())),
+                  icon: const Icon(Icons.science_outlined,
+                    color: BMHColors.inkDim, size: 16)),
+                const SizedBox(width: 8),
                 BMHIconButton(
                   onTap: () => ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

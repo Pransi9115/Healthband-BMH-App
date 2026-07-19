@@ -10,6 +10,24 @@
 import 'package:flutter/material.dart';
 import '../../features/home/main_shell.dart';
 
+/// Marker placed above MainShell's IndexedStack. Any BMHGlobalNav that
+/// finds this ancestor knows a nav bar is ALREADY on screen and renders
+/// nothing, so a screen can safely declare its own nav without ever
+/// producing two stacked tab bars.
+///
+/// This exists because HealthScreen declared its own nav while also
+/// being a MainShell tab, which drew the bar twice. A flag fixed that
+/// one case; this makes the whole class of bug impossible.
+class BMHNavScope extends InheritedWidget {
+  const BMHNavScope({super.key, required super.child});
+
+  static bool navAlreadyPresent(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<BMHNavScope>() != null;
+
+  @override
+  bool updateShouldNotify(BMHNavScope oldWidget) => false;
+}
+
 class BMHGlobalNav extends StatelessWidget {
   /// Index (0=Home, 1=Health, 2=Wellness, 3=Profile) to highlight as
   /// "active" on this screen. Pass null if this screen doesn't belong
@@ -30,6 +48,12 @@ class BMHGlobalNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A nav bar is already on screen (we're inside a MainShell tab) —
+    // draw nothing rather than stacking a second bar.
+    if (BMHNavScope.navAlreadyPresent(context)) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: _navBg,
