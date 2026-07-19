@@ -7,6 +7,8 @@ import '../../shared/widgets/bmh_global_nav.dart';
 import '../../core/ble/ble_service.dart';
 import '../../core/health/vital_history_service.dart';
 import '../../core/health/bioscore_calculator.dart';
+import '../../core/health/vital_status.dart';
+import '../../core/health/sleep_analyzer.dart';
 import 'live_health_screen.dart';
 import '../../shared/widgets/capsule_wave_measurement.dart';
 
@@ -342,8 +344,16 @@ class _HealthScreenState extends State<HealthScreen>
     final hrv  = _ble.hrv;
     final stress = _ble.stressLevel;
 
+    // FIX: this Scaffold previously had NO bottomNavigationBar and no
+    // back affordance. It inherits nav from MainShell when shown as a
+    // tab, but had neither when pushed as a route — which is why the
+    // Health Vitals page could appear with no way back and no tabs.
+    // Declaring it here makes the screen self-sufficient in both cases.
+    final canPop = Navigator.of(context).canPop();
+
     return Scaffold(
       backgroundColor: BMHColors.bg0,
+      bottomNavigationBar: const BMHGlobalNav(activeIndex: 1),
       body: Stack(children: [
         Positioned(top: -100, right: -100,
           child: Container(width: 350, height: 350,
@@ -358,10 +368,21 @@ class _HealthScreenState extends State<HealthScreen>
                 const SizedBox(height: 8),
                 // TOP BAR
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    BMHEyebrow('Bio Band', showDot: _ble.isBandConnected),
-                    const SizedBox(height: 4),
-                    Text('Bio Band', style: BMHText.heading1),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    // Back button — only when this screen sits on a
+                    // route that can actually be popped.
+                    if (canPop) ...[
+                      BMHIconButton(
+                        onTap: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back_rounded,
+                          color: BMHColors.ink, size: 16)),
+                      const SizedBox(width: 12),
+                    ],
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      BMHEyebrow('Bio Band', showDot: _ble.isBandConnected),
+                      const SizedBox(height: 4),
+                      Text('Bio Band', style: BMHText.heading1),
+                    ]),
                   ]),
                   Flexible(child: Row(mainAxisSize: MainAxisSize.min, children: [
                     // Band battery — medical-device status chip
@@ -999,16 +1020,24 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
   bool get _hasEnoughData => _spots.length >= 2;
 
   // Is current value in normal range?
-  String _status(double val) {
-    if (val == 0 && widget.liveValue == '--') return 'No data';
-    if (val >= _cfg.normalMin && val <= _cfg.normalMax) return 'Normal';
-    if (val < _cfg.normalMin) return 'Low';
-    return 'High';
-  }
+  // Superseded by VitalRanges.evaluate() — kept as a thin wrapper so
+  // any other call sites keep working.
+  // ignore: unused_element
+  String _status(double val) =>
+      VitalRanges.evaluateValue(widget.title, val).label;
 
+  BMHPillType _pillTypeFor(VitalStatus st) => switch (st.level) {
+        VitalLevel.normal => BMHPillType.success,
+        VitalLevel.noData => BMHPillType.info,
+        VitalLevel.low    => BMHPillType.warn,   // below range = caution
+        VitalLevel.high   => BMHPillType.danger, // above range = alert
+      };
+
+  // ignore: unused_element
   BMHPillType _statusType(String s) {
-    if (s == 'Normal') return BMHPillType.success;
+    if (s == 'Normal')  return BMHPillType.success;
     if (s == 'No data') return BMHPillType.info;
+    if (s == 'Low')     return BMHPillType.warn;
     return BMHPillType.danger;
   }
 
@@ -1296,8 +1325,14 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final liveNum = double.tryParse(widget.liveValue.replaceAll('/', '')) ?? 0;
-    final status = _status(liveNum);
+    // FIX: the old line was
+    //   double.tryParse(widget.liveValue.replaceAll('/', ''))
+    // which turned "116/66" into 11666 and therefore reported "High"
+    // for every blood-pressure reading. Status is now resolved per
+    // vital, with blood pressure evaluated as a systolic/diastolic
+    // PAIR against its own ranges.
+    final vitalStatus = VitalRanges.evaluate(widget.title, widget.liveValue);
+    final status = vitalStatus.label;
 
     return Scaffold(
       backgroundColor: BMHColors.bg0,
@@ -1353,7 +1388,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                         BMHEyebrow(widget.title, showDot: _ble.isBandConnected),
-                        BMHPill(status, type: _statusType(status)),
+                        BMHPill(status, type: _pillTypeFor(vitalStatus)),
                       ]),
                       const SizedBox(height: 10),
                       Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -1393,11 +1428,14 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                           borderRadius: BorderRadius.circular(BMHRadius.md),
                           border: Border.all(color: BMHColors.line)),
                         child: Row(children: [
-                          Expanded(child: _RefCell('Min', '${_cfg.normalMin.toStringAsFixed(_cfg.normalMin % 1 == 0 ? 0 : 1)} ${_cfg.unit}', BMHColors.sOxygen)),
+                          // Labels now come from VitalRanges so blood
+                          // pressure shows both sides (90/60 – 130/85)
+                          // instead of a single mislabelled number.
+                          Expanded(child: _RefCell('Min', VitalRanges.minLabel(widget.title), BMHColors.sOxygen)),
                           Container(width: 1, height: 30, color: BMHColors.line),
-                          Expanded(child: _RefCell('Normal', '${_cfg.normalMin.toStringAsFixed(0)}–${_cfg.normalMax.toStringAsFixed(0)}', BMHColors.sGut)),
+                          Expanded(child: _RefCell('Normal', VitalRanges.normalLabel(widget.title), BMHColors.sGut)),
                           Container(width: 1, height: 30, color: BMHColors.line),
-                          Expanded(child: _RefCell('Max', '${_cfg.normalMax.toStringAsFixed(_cfg.normalMax % 1 == 0 ? 0 : 1)} ${_cfg.unit}', BMHColors.sCardio)),
+                          Expanded(child: _RefCell('Max', VitalRanges.maxLabel(widget.title), BMHColors.sCardio)),
                         ]),
                       ),
                     ]),
@@ -1951,46 +1989,78 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
     return '${h}h ${m}m';
   }
 
+  // FIX: the old formula was (total - awake) / total, but `total`
+  // already EXCLUDED awake time — so it always evaluated to exactly
+  // 100%, which is why the screen reported "Sleep Efficiency 100%
+  // Optimal" on a broken night.
+  // Efficiency = time asleep / time in bed.
   double _efficiency() {
-    if (_sleep == null || _sleep!.totalMinutes == 0) return 0;
-    final awake = _sleep!.awakeMinutes;
-    return (((_sleep!.totalMinutes - awake) / _sleep!.totalMinutes) * 100).clamp(0, 100);
+    final s = _sleep;
+    if (s == null) return 0;
+    final asleep = s.totalMinutes;
+    final inBed  = asleep + s.awakeMinutes;
+    if (inBed <= 0) return 0;
+    return ((asleep / inBed) * 100).clamp(0, 100);
   }
 
   // Status badge helpers
+  // 'Not supported' and 'No data' render neutral grey — never red —
+  // so an unmeasurable metric doesn't look like a health problem.
+  bool _isNeutral(String s) => s == 'Not supported' || s == 'No data';
+
   Color _badgeBg(String status) {
+    if (_isNeutral(status)) return const Color(0xFF1c2333);
     if (status == 'Optimal') return const Color(0xFF1a3a2a);
-    if (status == 'Needs Attention') return const Color(0xFF3a2a10);
+    if (status == 'Needs Attention' || status == 'High') {
+      return const Color(0xFF3a2a10);
+    }
     return const Color(0xFF3a1a1a);
   }
 
   Color _badgeBorder(String status) {
+    if (_isNeutral(status)) return const Color(0xFF2c3648);
     if (status == 'Optimal') return const Color(0xFF2a6a4a);
-    if (status == 'Needs Attention') return const Color(0xFF6a4a20);
+    if (status == 'Needs Attention' || status == 'High') {
+      return const Color(0xFF6a4a20);
+    }
     return const Color(0xFF6a2a2a);
   }
 
   Color _badgeText(String status) {
+    if (_isNeutral(status)) return const Color(0xFF7c8698);
     if (status == 'Optimal') return const Color(0xFF4dbb8f);
-    if (status == 'Needs Attention') return const Color(0xFFe0a84a);
+    if (status == 'Needs Attention' || status == 'High') {
+      return const Color(0xFFe0a84a);
+    }
     return const Color(0xFFe05a5a);
   }
 
-  String _sleepStatus(double hours) {
-    if (hours >= 7 && hours <= 9) return 'Optimal';
-    if (hours >= 6) return 'Needs Attention';
-    return 'Low';
-  }
+  // FIX: these had NO upper bound, so 4h24m of deep sleep (264 min)
+  // proudly reported "Optimal". Deep and light sleep are now judged
+  // as a PERCENTAGE of the night, which is how they are actually
+  // assessed clinically, and both ends of the range are checked.
+  String _sleepStatus(double hours) => SleepAnalyzer.totalStatus(hours);
 
-  String _deepStatus(int min) {
-    if (min >= 60) return 'Optimal';
-    if (min >= 40) return 'Needs Attention';
-    return 'Low';
-  }
+  int get _asleepMin => _sleep?.totalMinutes ?? 0;
+
+  String _deepStatus(int min) =>
+      SleepAnalyzer.deepStatus(min, _asleepMin);
+
+  String _lightStatus(int min) =>
+      SleepAnalyzer.lightStatus(min, _asleepMin);
+
+  // The JStyle 0x53 stream carries no REM channel — the vendor SDK
+  // (resolve_util.getSleepData) returns raw quality values only. So
+  // REM is reported as unsupported rather than stamped "Low", which
+  // wrongly implied a measured deficit.
+  bool get _remSupported => false;
 
   String _remStatus(int min) {
-    if (min >= 70) return 'Optimal';
-    if (min >= 45) return 'Needs Attention';
+    if (!_remSupported) return 'Not supported';
+    if (_asleepMin <= 0) return 'No data';
+    final pct = min / _asleepMin * 100;
+    if (pct >= 20 && pct <= 25) return 'Optimal';
+    if (pct >= 15 && pct < 20)  return 'Needs Attention';
     return 'Low';
   }
 
@@ -2401,17 +2471,23 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
                         label: 'Light Sleep',
                         minutes: lightMin,
                         color: const Color(0xFF5bc4f5),
-                        status: lightMin >= 90 ? 'Optimal' : 'Needs Attention'),
+                        // was a flat `lightMin >= 90` check, which took
+                        // no account of how long the night actually was
+                        status: _lightStatus(lightMin)),
                       _stageCard(
                         label: 'REM Sleep',
                         minutes: remMin,
                         color: BMHColors.sGut,
+                        // Reports "Not supported" — this band's 0x53
+                        // stream has no REM channel, so a red "Low"
+                        // badge here was misleading.
                         status: _remStatus(remMin)),
                       _stageCard(
                         label: 'Awake Time',
                         minutes: awakeMin,
                         color: BMHColors.sCardio,
-                        status: awakeMin <= 30 ? 'Optimal' : 'Needs Attention'),
+                        status: SleepAnalyzer.awakeStatus(
+                          awakeMin, _asleepMin + awakeMin)),
                     ]),
 
                   const SizedBox(height: 16),

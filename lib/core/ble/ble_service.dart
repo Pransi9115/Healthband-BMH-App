@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../health/vital_history_service.dart';
+import '../health/sleep_analyzer.dart';
+import '../health/vital_cache.dart';
 
 // ─────────────────────────────────────────────────────────
 //  EXACT UUIDs FROM 2208A SDK constant.dart
@@ -188,16 +190,57 @@ class BleService extends ChangeNotifier {
   // without needing any per-screen isWearing check.
   // Steps, calories, distance, battery, stepGoal are NOT gated
   // (pedometer & battery work regardless of skin contact).
-  int    get heartRate   => _isWearing ? _heartRate   : 0;
-  int    get spo2        => _isWearing ? _spo2        : 0;
-  double get temperature => _isWearing ? _temperature : 0.0;
-  int    get hrv         => _isWearing ? _hrv         : 0;
-  int    get stressLevel => _isWearing ? _stressLevel : 0;
-  int    get vitalAge    => _isWearing ? _vitalAge    : 0;
-  int get bpSystolic     => _isWearing ? _bpSystolic  : 0;
-  int get bpDiastolic    => _isWearing ? _bpDiastolic : 0;
-  String get bloodPressure => (_isWearing && _bpSystolic > 0)
-      ? '$_bpSystolic/$_bpDiastolic' : '--/--';
+  // ── FIX: the "-- then data returns" flicker ───────────────────────
+  //
+  // These getters used to return 0 the moment _isWearing went false,
+  // and the UI renders 0 as '--'. But _startWearDetection() resets
+  // _wearProbeReceived=false on EVERY connect and re-probes the
+  // hardware at 3s and 8s. During that window _isWearing is false, so
+  // every screen blanked to '--' even though the real values were
+  // still sitting in memory untouched.
+  //
+  // That was never a connectivity loss — the data was being hidden and
+  // then "recovering" when the probe landed. Exactly the behaviour of
+  // leaving Health Vitals, seeing '--' on Home, then the numbers
+  // reappearing a few seconds later.
+  //
+  // Now: when the live gate closes but we hold a reading from the last
+  // 5 minutes, keep showing it. The UI can flag it stale via
+  // VitalCache.staleLabel(). Only genuinely old data falls back to '--'.
+  final _cache = VitalCache.instance;
+
+  int get heartRate =>
+      _cache.display('hr', (_isWearing ? _heartRate : 0).toDouble()).round();
+  int get spo2 =>
+      _cache.display('spo2', (_isWearing ? _spo2 : 0).toDouble()).round();
+  double get temperature =>
+      _cache.display('temp', _isWearing ? _temperature : 0.0);
+  int get hrv =>
+      _cache.display('hrv', (_isWearing ? _hrv : 0).toDouble()).round();
+  int get stressLevel =>
+      _cache.display('stress', (_isWearing ? _stressLevel : 0).toDouble()).round();
+  int get vitalAge =>
+      _cache.display('vitalAge', (_isWearing ? _vitalAge : 0).toDouble()).round();
+  int get bpSystolic =>
+      _cache.display('bp', (_isWearing ? _bpSystolic : 0).toDouble()).round();
+  int get bpDiastolic =>
+      _cache.display('bp_2', (_isWearing ? _bpDiastolic : 0).toDouble()).round();
+
+  String get bloodPressure => _cache.displayBloodPressure(
+      _isWearing ? _bpSystolic : 0, _isWearing ? _bpDiastolic : 0);
+
+  /// True when what's on screen came from cache during a probe gap.
+  bool isVitalStale(String key) => _cache.isStale(
+      key, key == 'hr' ? (_isWearing ? _heartRate : 0).toDouble() : 0);
+
+  /// "2m ago" label for a cached reading, or null when live.
+  String? vitalAgeLabel(String key) => _cache.staleLabel(key, 0);
+
+  /// Raw, ungated values — use where you need the true live state.
+  int    get rawHeartRate   => _heartRate;
+  int    get rawSpo2        => _spo2;
+  double get rawTemperature => _temperature;
+  int    get rawHrv         => _hrv;
   // Not gated — these work off-wrist
   int    get steps       => _steps;
   int    get battery     => _battery;
@@ -1512,10 +1555,15 @@ class BleService extends ChangeNotifier {
   // ─────────────────────────────────────────────────────
   final Map<int, (int, int)> _sleepSamples = {};
 
-  // Stage thresholds — quality value = movement in the interval.
-  // Tunable: validate totals against the vendor (JCVital) app.
-  static const int _deepMax  = 3;   // 0–3   → deep sleep
-  static const int _lightMax = 40;  // 4–40  → light sleep, >40 → awake
+  // Stage classification now lives in SleepAnalyzer, which detects
+  // whether the band is sending ordinal stage codes or movement
+  // magnitudes and classifies accordingly. The old fixed thresholds
+  // (_deepMax=3 / _lightMax=40) assumed magnitude always, which made
+  // ordinal nights come out ~95% "deep".
+  //
+  // Last night's raw dump, kept for calibration against JCVital.
+  SleepDebugReport? _lastSleepDebug;
+  SleepDebugReport? get lastSleepDebug => _lastSleepDebug;
 
   void _rebuildSleepFromSamples() {
     if (_sleepSamples.isEmpty) return;
@@ -1544,14 +1592,28 @@ class BleService extends ChangeNotifier {
     final sortedNights = nights.keys.toList()..sort();
     for (final nk in sortedNights.reversed) {
       final samples = nights[nk]!..sort((a, b) => a.key.compareTo(b.key));
-      int deep = 0, light = 0, awake = 0;
-      for (final s in samples) {
-        final (q, unit) = s.value;
-        if (q <= _deepMax) { deep += unit; }
-        else if (q <= _lightMax) { light += unit; }
-        else { awake += unit; }
-      }
-      final total = deep + light; // asleep time (excludes awake)
+
+      // Hand the raw samples to SleepAnalyzer, which picks the right
+      // interpretation and applies physiological guard rails.
+      final analyzed = SleepAnalyzer.analyze([
+        for (final e in samples)
+          SleepSample(
+            DateTime.fromMillisecondsSinceEpoch(e.key * 60000),
+            e.value.$1,
+            e.value.$2),
+      ]);
+      _lastSleepDebug = SleepAnalyzer.debug([
+        for (final e in samples)
+          SleepSample(
+            DateTime.fromMillisecondsSinceEpoch(e.key * 60000),
+            e.value.$1,
+            e.value.$2),
+      ]);
+
+      final deep  = analyzed.deepMinutes;
+      final light = analyzed.lightMinutes;
+      final awake = analyzed.awakeMinutes;
+      final total = analyzed.asleepMinutes; // asleep (excludes awake)
       // Valid night: 30 min – 16 h of tracked time
       if (total < 30 || total + awake > 960) continue;
 
@@ -1568,7 +1630,7 @@ class BleService extends ChangeNotifier {
         lightMinutes: light,
         remMinutes:   0, // band does not report REM in 0x53
         awakeMinutes: awake,
-        quality: _sleepQ(total),
+        quality: SleepAnalyzer.quality(total),
         date: endTime);
 
       if (isNew) {
@@ -1593,6 +1655,8 @@ class BleService extends ChangeNotifier {
     });
   }
 
+  // Superseded by SleepAnalyzer.quality() — kept for compatibility.
+  // ignore: unused_element
   String _sleepQ(int m) {
     if (m >= 480) return 'Excellent';
     if (m >= 420) return 'Good';
@@ -1605,7 +1669,8 @@ class BleService extends ChangeNotifier {
   // ─────────────────────────────────────────────────────
   Future<void> disconnectDevice(BMHDeviceType type) async {
     if (type != BMHDeviceType.bioScale) {
-      _manualDisconnect = true; // user chose this — stop all auto-reconnect
+      _manualDisconnect = true;
+    VitalCache.instance.clearAll(); // don't show old readings after unpair // user chose this — stop all auto-reconnect
       // Also disable launch auto-reconnect (re-enabled on next connect)
       SharedPreferences.getInstance()
           .then((p) => p.setBool(_kAutoRc, false));

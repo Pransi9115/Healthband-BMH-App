@@ -1,12 +1,12 @@
-import '../../core/health/health_service.dart';
+import '../../../core/health/health_service.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../shared/theme/bmh_tokens.dart';
-import '../../shared/widgets/bmh_widgets.dart';
-import '../../core/ble/ble_service.dart';
+import '../../../shared/theme/bmh_tokens.dart';
+import '../../../shared/widgets/bmh_widgets.dart';
+import '../../../core/ble/ble_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

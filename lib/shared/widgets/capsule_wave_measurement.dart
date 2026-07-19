@@ -73,8 +73,9 @@ class MeasurementTypeConfig {
           expectedSeconds: 20);
       case MeasurementType.glucose:
         return const MeasurementTypeConfig(
+          // FIX: was amber 0xFFF59E0B — glucose measurement pill is red.
           title: 'Blood Glucose', icon: Icons.bloodtype_rounded,
-          color: Color(0xFFF59E0B), unit: 'mg/dL',
+          color: Color(0xFFFF3B4E), unit: 'mg/dL',
           instruction: 'Keep the sensor in contact until the reading completes.',
           expectedSeconds: null);
       case MeasurementType.steps:

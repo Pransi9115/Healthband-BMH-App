@@ -13,6 +13,7 @@ import '../settings/settings_screen.dart';
 import 'main_shell.dart';
 import 'daily_checkin_screen.dart';
 import 'biomedical_monitoring_screen.dart';
+import '../diet/diet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -222,11 +223,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       subtitle: 'Schedule · Reminders',
                       signalColor: BMHColors.sNervous,
                       icon: const Icon(Icons.medication_outlined)),
+                    // FIX: this card had no onTap and no expandedContent,
+                    // so tapping it did nothing. It now opens the
+                    // BioMedical Diet module.
                     BMHModuleCard(
                       title: 'BioMedical Diet',
                       subtitle: 'Meals · Kitchen · Macros',
                       signalColor: BMHColors.sMetabolic,
-                      icon: const Icon(Icons.restaurant_menu_outlined)),
+                      icon: const Icon(Icons.restaurant_menu_outlined),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => const DietScreen()))),
                     BMHModuleCard(
                       title: 'Bio Care Team',
                       subtitle: 'Doctors · Coaches · Consults',
