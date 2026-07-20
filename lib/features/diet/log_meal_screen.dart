@@ -39,6 +39,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
 
   late MealType _type;
   late TimeOfDay _time;
+  late DateTime _date;   // editable via the calendar picker
   final List<FoodItem> _selected = [];
   final _searchCtrl = TextEditingController();
   String _query = '';
@@ -59,6 +60,9 @@ class _LogMealScreenState extends State<LogMealScreen> {
     _time = ex != null
         ? TimeOfDay(hour: ex.time.hour, minute: ex.time.minute)
         : TimeOfDay.now();
+    _date = ex != null
+        ? DateTime(ex.time.year, ex.time.month, ex.time.day)
+        : DateTime(widget.day.year, widget.day.month, widget.day.day);
     if (ex != null) _selected.addAll(ex.foods);
     _searchCtrl.addListener(() {
       setState(() => _query = _searchCtrl.text);
@@ -130,6 +134,24 @@ class _LogMealScreenState extends State<LogMealScreen> {
     if (t != null) setState(() => _time = t);
   }
 
+  Future<void> _pickDate() async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now(),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: _accent,
+            surface: BMHColors.bg3,
+            onSurface: BMHColors.ink)),
+        child: child!));
+    if (d != null) {
+      setState(() => _date = DateTime(d.year, d.month, d.day));
+    }
+  }
+
   String _autoTitle() {
     if (_selected.isEmpty) return _type.label;
     if (_selected.length == 1) return _selected.first.name;
@@ -145,22 +167,28 @@ class _LogMealScreenState extends State<LogMealScreen> {
     setState(() => _saving = true);
 
     final when = DateTime(
-      widget.day.year, widget.day.month, widget.day.day,
+      _date.year, _date.month, _date.day,
       _time.hour, _time.minute);
 
     final ex = widget.existingMeal;
+    final movedDay = ex != null &&
+        DietService.dayKey(_date) != DietService.dayKey(ex.time);
 
-    if (ex != null) {
-      // Editing, or converting a planned meal into an eaten one.
-      await _diet.updateMeal(widget.day, ex.copyWith(
+    if (ex != null && !movedDay) {
+      // Editing in place, or converting a planned meal into eaten.
+      await _diet.updateMeal(_date, ex.copyWith(
         type: _type,
         time: when,
         title: _autoTitle(),
         foods: List.of(_selected),
         planned: false));
     } else {
-      await _diet.addMeal(widget.day, Meal(
-        id: 'meal_${DateTime.now().microsecondsSinceEpoch}',
+      if (movedDay) {
+        // The patient changed the date while editing: move the meal.
+        await _diet.deleteMeal(ex!.time, ex.id);
+      }
+      await _diet.addMeal(_date, Meal(
+        id: ex?.id ?? 'meal_${DateTime.now().microsecondsSinceEpoch}',
         type: _type,
         time: when,
         title: _autoTitle(),
@@ -277,21 +305,24 @@ class _LogMealScreenState extends State<LogMealScreen> {
                             color: BMHColors.ink)),
                       ])))),
                   const SizedBox(width: 10),
-                  Expanded(child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 13),
-                    decoration: BoxDecoration(
-                      color: BMHColors.surface,
-                      borderRadius: BorderRadius.circular(BMHRadius.md),
-                      border: Border.all(color: BMHColors.line)),
-                    child: Row(children: [
-                      const Icon(Icons.calendar_today_rounded,
-                        color: BMHColors.inkDim, size: 14),
-                      const SizedBox(width: 8),
-                      Text(_dayLabel(),
-                        style: BMHText.labelLg.copyWith(
-                          color: BMHColors.ink)),
-                    ]))),
+                  Expanded(child: GestureDetector(
+                    onTap: _pickDate,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: BMHColors.surface,
+                        borderRadius: BorderRadius.circular(BMHRadius.md),
+                        border: Border.all(color: BMHColors.line)),
+                      child: Row(children: [
+                        const Icon(Icons.calendar_today_rounded,
+                          color: BMHColors.inkDim, size: 14),
+                        const SizedBox(width: 8),
+                        Text(_dayLabel(),
+                          style: BMHText.labelLg.copyWith(
+                            color: BMHColors.ink)),
+                      ])))),
                 ]),
 
                 const SizedBox(height: 20),
@@ -313,7 +344,15 @@ class _LogMealScreenState extends State<LogMealScreen> {
                       cursorColor: _accent,
                       decoration: InputDecoration(
                         isDense: true,
+                        // Override the app-wide filled/outlined input
+                        // theme — this field lives inside its own
+                        // styled container, so the theme's inner box
+                        // was drawing a second border around it.
+                        filled: false,
+                        fillColor: Colors.transparent,
                         border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                         contentPadding:
                           const EdgeInsets.symmetric(vertical: 14),
                         hintText: 'Search foods to add…',
@@ -347,7 +386,13 @@ class _LogMealScreenState extends State<LogMealScreen> {
                 if (results.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: Text('No foods found',
+                    child: Center(child: Text(
+                      _query.trim().isEmpty
+                        ? 'No recent foods yet.\n'
+                          'Search above to add your first food — '
+                          'foods you log will appear here.'
+                        : 'No foods found',
+                      textAlign: TextAlign.center,
                       style: BMHText.bodySm.copyWith(
                         color: BMHColors.inkMute))))
                 else
@@ -383,13 +428,21 @@ class _LogMealScreenState extends State<LogMealScreen> {
               Text(
                 _selected.isEmpty
                   ? '—'
-                  : '${_kcal.round()} kcal · '
-                    'P${_protein.round()} '
-                    'C${_carbs.round()} '
-                    'F${_fat.round()}',
+                  : 'Meal total: ${_kcal.round()} kcal',
                 style: BMHText.monoSm.copyWith(
                   fontSize: 11, color: _accent)),
             ]),
+            if (_selected.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Protein ${_protein.round()}g · '
+                  'Carbs ${_carbs.round()}g · '
+                  'Fat ${_fat.round()}g',
+                  style: BMHText.monoSm.copyWith(
+                    fontSize: 10, color: BMHColors.inkMute))),
+            ],
             const SizedBox(height: 12),
             GestureDetector(
               onTap: _selected.isEmpty ? null : _save,
@@ -423,7 +476,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
 
   String _dayLabel() {
     final n = DateTime.now();
-    final d = widget.day;
+    final d = _date;
     if (d.year == n.year && d.month == n.month && d.day == n.day) {
       return 'Today';
     }
@@ -467,8 +520,7 @@ class _FoodRow extends StatelessWidget {
                 style: BMHText.labelLg.copyWith(color: BMHColors.ink)),
               const SizedBox(height: 3),
               Text(
-                '${food.portion} · ${food.kcal.round()} kcal · '
-                '${food.macroSummary}',
+                '${food.portion} · ${food.kcal.round()} kcal',
                 style: BMHText.monoSm.copyWith(
                   fontSize: 10, color: BMHColors.inkMute)),
             ])),

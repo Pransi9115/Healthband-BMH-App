@@ -54,6 +54,26 @@ class _DietScreenState extends State<DietScreen> {
     _diet.ensureDay(next);
   }
 
+  /// Tap the date label → full calendar, jump to any day.
+  Future<void> _pickDay() async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _day,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now(),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: _accent,
+            surface: BMHColors.bg3,
+            onSurface: BMHColors.ink)),
+        child: child!));
+    if (d != null) {
+      setState(() => _day = DateTime(d.year, d.month, d.day));
+      _diet.ensureDay(_day);
+    }
+  }
+
   String get _dayLabel {
     if (_isToday) return 'Today · ${_fmtDate(_day)}';
     final y = DateTime.now().subtract(const Duration(days: 1));
@@ -139,9 +159,19 @@ class _DietScreenState extends State<DietScreen> {
                       behavior: HitTestBehavior.opaque,
                       child: const Icon(Icons.chevron_left_rounded,
                         color: BMHColors.inkDim, size: 20)),
-                    Expanded(child: Text(_dayLabel,
-                      textAlign: TextAlign.center,
-                      style: BMHText.labelLg.copyWith(color: BMHColors.ink))),
+                    Expanded(child: GestureDetector(
+                      onTap: _pickDay,
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.calendar_today_rounded,
+                            color: BMHColors.inkDim, size: 13),
+                          const SizedBox(width: 7),
+                          Text(_dayLabel,
+                            style: BMHText.labelLg.copyWith(
+                              color: BMHColors.ink)),
+                        ]))),
                     GestureDetector(
                       onTap: _isToday ? null : () => _shiftDay(1),
                       behavior: HitTestBehavior.opaque,
@@ -249,7 +279,9 @@ class _DietScreenState extends State<DietScreen> {
 
                 const SizedBox(height: 22),
 
-                Text("TODAY'S MEALS",
+                Text(_isToday
+                    ? "TODAY'S MEALS"
+                    : 'MEALS · ${_fmtDate(_day).toUpperCase()}',
                   style: BMHText.monoSm.copyWith(
                     fontSize: 10, letterSpacing: 1.6,
                     color: BMHColors.inkDim)),
@@ -287,6 +319,55 @@ class _DietScreenState extends State<DietScreen> {
                           if (mounted) setState(() {});
                         }
                       }))),
+
+                // ── MEAL TOTALS ─────────────────────
+                if (meals.any((m) => !m.planned)) ...[
+                  const SizedBox(height: 18),
+                  Text('MEAL TOTALS',
+                    style: BMHText.monoSm.copyWith(
+                      fontSize: 10, letterSpacing: 1.6,
+                      color: BMHColors.inkDim)),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: BMHColors.surface,
+                      borderRadius: BorderRadius.circular(BMHRadius.lg),
+                      border: Border.all(color: BMHColors.line)),
+                    child: Column(children: [
+                      for (final t in MealType.values)
+                        if (_diet.kcalForType(_day, t) > 0)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 8),
+                            child: Row(children: [
+                              Expanded(child: Text(t.label,
+                                style: BMHText.labelMd.copyWith(
+                                  color: BMHColors.ink2))),
+                              Text(
+                                '${_diet.kcalForType(_day, t).round()} kcal',
+                                style: BMHText.monoSm.copyWith(
+                                  fontSize: 11,
+                                  color: BMHColors.inkDim)),
+                            ])),
+                      const Divider(
+                        color: BMHColors.line, height: 14),
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          top: 4, bottom: 10),
+                        child: Row(children: [
+                          Expanded(child: Text('Day total',
+                            style: BMHText.labelLg.copyWith(
+                              color: BMHColors.ink,
+                              fontWeight: FontWeight.w600))),
+                          Text('${kcal.round()} kcal',
+                            style: BMHText.monoMd.copyWith(
+                              color: _accent,
+                              fontWeight: FontWeight.w600)),
+                        ])),
+                    ])),
+                ],
 
                 const SizedBox(height: 18),
 
@@ -475,9 +556,11 @@ class _MealRow extends StatelessWidget {
                     style: BMHText.monoSm.copyWith(
                       fontSize: 10, color: accent)),
                   const SizedBox(width: 10),
-                  Text(meal.macroChips,
+                  Expanded(child: Text(meal.macroChips,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: BMHText.monoSm.copyWith(
-                      fontSize: 10, color: BMHColors.inkMute)),
+                      fontSize: 10, color: BMHColors.inkMute))),
                 ]),
               ],
             ])),
@@ -489,5 +572,6 @@ class _MealRow extends StatelessWidget {
 
 extension on Meal {
   String get macroChips =>
-      'P${proteinG.round()}  C${carbsG.round()}  F${fatG.round()}';
+      'Protein ${proteinG.round()}g · Carbs ${carbsG.round()}g · '
+      'Fat ${fatG.round()}g';
 }

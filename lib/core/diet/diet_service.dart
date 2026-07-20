@@ -60,21 +60,14 @@ class DietService extends ChangeNotifier {
         _recentFoods = [];
       }
     }
-    if (_recentFoods.isEmpty) _recentFoods = List.of(FoodLibrary.starterRecents);
+    // No sample data: the diary only ever contains what the patient
+    // logs. Recent foods stay empty until real meals are saved, and
+    // any demo meals seeded by an earlier build are stripped out the
+    // first time their day is loaded (see _loadDay).
+    _recentFoods.removeWhere((f) => f.id.startsWith('seed_'));
+    await _prefs!.remove(_kSeeded);
 
     await _loadDay(DateTime.now());
-
-    // First run only: seed today with the sample day from the
-    // prototype so the screen is not empty on first open. Any real
-    // logging replaces it, and it never re-seeds.
-    if (!(_prefs!.getBool(_kSeeded) ?? false)) {
-      final key = dayKey(DateTime.now());
-      if ((_mealsByDay[key] ?? const []).isEmpty) {
-        _mealsByDay[key] = FoodLibrary.sampleDay(DateTime.now());
-        await _saveDay(DateTime.now());
-      }
-      await _prefs!.setBool(_kSeeded, true);
-    }
 
     _ready = true;
     notifyListeners();
@@ -90,9 +83,15 @@ class DietService extends ChangeNotifier {
       return;
     }
     try {
-      _mealsByDay[key] = (jsonDecode(raw) as List)
+      final loaded = (jsonDecode(raw) as List)
           .map((e) => Meal.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
+      // Strip demo meals left behind by earlier builds so only
+      // patient-entered data ever appears in the diary.
+      final cleaned =
+          loaded.where((m) => !m.id.startsWith('seed_')).toList();
+      _mealsByDay[key] = cleaned;
+      if (cleaned.length != loaded.length) await _saveDay(day);
     } catch (_) {
       _mealsByDay[key] = [];
     }
@@ -147,6 +146,11 @@ class DietService extends ChangeNotifier {
   double sugarsFor(DateTime day) => mealsFor(day)
       .where((m) => !m.planned)
       .fold(0.0, (s, m) => s + m.sugarsG);
+
+  /// Calories eaten for one meal type — powers the per-meal totals.
+  double kcalForType(DateTime day, MealType type) => mealsFor(day)
+      .where((m) => !m.planned && m.type == type)
+      .fold(0.0, (s, m) => s + m.kcal);
 
   /// Micronutrient totals for the day.
   Map<String, double> microsFor(DateTime day) {
@@ -388,49 +392,4 @@ class FoodLibrary {
     return null;
   }
 
-  static List<FoodItem> get starterRecents => [
-        catalogue.firstWhere((f) => f.id == 'chicken_breast'),
-        catalogue.firstWhere((f) => f.id == 'brown_rice'),
-        catalogue.firstWhere((f) => f.id == 'broccoli'),
-      ];
-
-  /// The sample day from the HTML prototype — used once on first run.
-  static List<Meal> sampleDay(DateTime day) {
-    DateTime at(int h, int m) => DateTime(day.year, day.month, day.day, h, m);
-    return [
-      Meal(
-        id: 'seed_breakfast',
-        type: MealType.breakfast,
-        time: at(7, 40),
-        title: 'Greek yogurt, berries & granola',
-        foods: [
-          byId('greek_yogurt')!,
-          byId('berries')!,
-          byId('granola')!,
-        ],
-      ),
-      Meal(
-        id: 'seed_snack',
-        type: MealType.snack,
-        time: at(10, 30),
-        title: 'Almonds & green apple',
-        foods: [byId('almonds')!, byId('green_apple')!],
-      ),
-      Meal(
-        id: 'seed_lunch',
-        type: MealType.lunch,
-        time: at(13, 5),
-        title: 'Grilled salmon, quinoa & greens',
-        foods: [byId('salmon')!, byId('quinoa')!, byId('mixed_greens')!],
-      ),
-      Meal(
-        id: 'seed_dinner',
-        type: MealType.dinner,
-        time: at(19, 30),
-        title: 'Planned · tap to log when eaten',
-        foods: const [],
-        planned: true,
-      ),
-    ];
-  }
 }

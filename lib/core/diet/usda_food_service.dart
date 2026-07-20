@@ -142,8 +142,14 @@ class UsdaFoodService {
       portion = '${servingSize.round()} $servingUnit serving';
     }
 
-    final brand = (f['brandOwner'] as String? ?? '').trim();
-    final name = _titleCase(rawName) + (brand.isNotEmpty ? ' · $brand' : '');
+    // Prefer the consumer-facing brand ("McDonald's", "Amul") over
+    // the legal owner ("Grafton Village Cheese Co, LLC"). FDC branded
+    // rows carry both; brandName is what shoppers recognise.
+    final brandName  = (f['brandName']  as String? ?? '').trim();
+    final brandOwner = (f['brandOwner'] as String? ?? '').trim();
+    final brand = brandName.isNotEmpty ? brandName : brandOwner;
+    final name = _titleCase(rawName) +
+        (brand.isNotEmpty ? ' · ${_brandCase(brand)}' : '');
 
     return FoodItem(
       id: 'fdc_$fdcId', // never collides with local FoodLibrary ids
@@ -164,4 +170,12 @@ class UsdaFoodService {
     final lower = s.toLowerCase();
     return lower.isEmpty ? s : lower[0].toUpperCase() + lower.substring(1);
   }
+
+  /// FDC brand fields often arrive in ALL CAPS ("MCDONALD'S").
+  /// Capitalise each word instead so the row reads naturally.
+  static String _brandCase(String s) => s
+      .toLowerCase()
+      .split(RegExp(r'\s+'))
+      .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
+      .join(' ');
 }

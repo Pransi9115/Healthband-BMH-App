@@ -100,8 +100,10 @@ class FoodItem {
     this.micros = const {},
   });
 
+  /// Plain-word macro summary — no P/C/F codes in the UI.
   String get macroSummary =>
-      'P${proteinG.round()} C${carbsG.round()} F${fatG.round()}';
+      'Protein ${proteinG.round()}g · Carbs ${carbsG.round()}g · '
+      'Fat ${fatG.round()}g';
 
   Map<String, dynamic> toJson() => {
         'id': id,
