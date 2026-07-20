@@ -2,13 +2,18 @@
 //  DIET — LOG A MEAL
 //  Meal type · time · food search · recent foods · save
 //  Writes through DietService, so entries persist.
+//  Food search is backed by the USDA FoodData Central API,
+//  with the local FoodLibrary as an offline fallback.
 // ─────────────────────────────────────────────────────────
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../core/diet/diet_models.dart';
 import '../../core/diet/diet_service.dart';
+import '../../core/diet/usda_food_service.dart';
 
 class LogMealScreen extends StatefulWidget {
   final DateTime day;
@@ -39,6 +44,11 @@ class _LogMealScreenState extends State<LogMealScreen> {
   String _query = '';
   bool _saving = false;
 
+  // ── USDA live search state ─────────────────────────────
+  Timer? _debounce;
+  List<FoodItem> _apiResults = [];
+  bool _searching = false;
+
   bool get _isEdit => widget.existingMeal != null && !widget.existingMeal!.planned;
 
   @override
@@ -52,11 +62,30 @@ class _LogMealScreenState extends State<LogMealScreen> {
     if (ex != null) _selected.addAll(ex.foods);
     _searchCtrl.addListener(() {
       setState(() => _query = _searchCtrl.text);
+      _debounce?.cancel();
+      if (_query.trim().length < 2) {
+        setState(() {
+          _apiResults = [];
+          _searching = false;
+        });
+        return;
+      }
+      final sent = _query; // guard against out-of-order responses
+      _debounce = Timer(const Duration(milliseconds: 500), () async {
+        setState(() => _searching = true);
+        final r = await UsdaFoodService.instance.search(sent);
+        if (!mounted || sent != _query) return;
+        setState(() {
+          _apiResults = r;
+          _searching = false;
+        });
+      });
     });
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -154,9 +183,10 @@ class _LogMealScreenState extends State<LogMealScreen> {
   Widget build(BuildContext context) {
     final results = _query.trim().isEmpty
         ? _diet.recentFoods
-        : FoodLibrary.search(_query);
-    final listTitle =
-        _query.trim().isEmpty ? 'RECENT FOODS' : 'SEARCH RESULTS';
+        : (_apiResults.isNotEmpty ? _apiResults : FoodLibrary.search(_query));
+    final listTitle = _query.trim().isEmpty
+        ? 'RECENT FOODS'
+        : (_apiResults.isNotEmpty ? 'USDA RESULTS' : 'SEARCH RESULTS');
 
     return Scaffold(
       backgroundColor: BMHColors.bg0,
@@ -295,6 +325,16 @@ class _LogMealScreenState extends State<LogMealScreen> {
                         child: const Icon(Icons.close_rounded,
                           color: BMHColors.inkDim, size: 16)),
                   ])),
+
+                if (_searching)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(BMHRadius.full),
+                      child: LinearProgressIndicator(
+                        minHeight: 2,
+                        color: _accent,
+                        backgroundColor: BMHColors.line))),
 
                 const SizedBox(height: 20),
 

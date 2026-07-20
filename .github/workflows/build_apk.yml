@@ -29,7 +29,7 @@ jobs:
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=FDC_API_KEY=${{ secrets.FDC_API_KEY }}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
