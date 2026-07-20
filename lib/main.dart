@@ -9,6 +9,7 @@ import 'core/ble/ble_service.dart';
 import 'core/health/vital_history_service.dart';
 import 'core/health/health_service.dart';
 import 'core/diet/diet_service.dart';
+import 'core/battery/battery_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +59,7 @@ void main() async {
   BleService.instance;
   await VitalHistoryService.instance.init();
   await DietService.instance.init(); // diet log persistence
+  await BatteryService.instance.init(); // live battery + low alerts
 
   // ── Request permissions on iOS at startup ────────────
   // This makes all permissions appear in iOS Settings

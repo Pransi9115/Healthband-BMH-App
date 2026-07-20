@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../core/ble/ble_service.dart';
+import '../../core/battery/battery_service.dart';
+import 'battery_alerts_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -23,6 +25,11 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool get wantKeepAlive => true;
 
   final _ble = BleService.instance;
+  final _bat = BatteryService.instance;
+
+  void _onBattery() {
+    if (mounted) setState(() {});
+  }
 
   bool _healthConnected = false;
   bool _healthSyncing   = false;
@@ -49,6 +56,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.initState();
     _loadProfile();
     _checkHealthConnectState();
+    _bat.addListener(_onBattery);
+    _bat.init();
+  }
+
+  @override
+  void dispose() {
+    _bat.removeListener(_onBattery);
+    super.dispose();
   }
 
   // Reflects whatever Android Health Connect actually has granted right
@@ -157,6 +172,14 @@ class _ProfileScreenState extends State<ProfileScreen>
               if (Platform.isAndroid) _buildHealthCard()
               else if (Platform.isIOS) _buildAppleHealthCard(),
               const SizedBox(height: 24),
+              BMHSectionTitle('Device battery'),
+              const SizedBox(height: 14),
+              if (_bat.showLowBanner) ...[
+                _buildBatteryBanner(),
+                const SizedBox(height: 12),
+              ],
+              _buildBatteryCard(),
+              const SizedBox(height: 24),
               BMHSectionTitle('Settings'),
               const SizedBox(height: 14),
               _buildSettingsCard([
@@ -193,6 +216,143 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       ),
     );
+  }
+
+  // ── DEVICE BATTERY ───────────────────────────────────────
+  Color get _batColor {
+    if (_bat.charging) return BMHColors.sGut;
+    if (_bat.level < 0) return BMHColors.inkMute;
+    if (_bat.level <= BatteryService.notifyAt) return BMHColors.danger;
+    if (_bat.level <= BatteryService.warnAt) return BMHColors.warn;
+    return BMHColors.sGut;
+  }
+
+  /// In-app alert shown at ≤25% (amber) and ≤20% (red).
+  Widget _buildBatteryBanner() {
+    final urgent = _bat.bannerLevel == 'notify';
+    final color = urgent ? BMHColors.danger : BMHColors.warn;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: color.withOpacity(0.5))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(urgent
+            ? Icons.battery_alert_rounded
+            : Icons.battery_2_bar_rounded,
+          color: color, size: 22),
+        const SizedBox(width: 12),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              urgent
+                ? 'Battery very low — ${_bat.level}%'
+                : 'Battery getting low — ${_bat.level}%',
+              style: BMHText.labelLg.copyWith(
+                color: color, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 3),
+            Text(
+              urgent
+                ? 'Please charge your phone now. Your notify persons '
+                  'have been alerted.'
+                : 'Please put your phone on charge soon so health '
+                  'monitoring is not interrupted.',
+              style: BMHText.bodySm.copyWith(
+                fontSize: 11, color: BMHColors.ink2)),
+          ])),
+        GestureDetector(
+          onTap: _bat.dismissBanner,
+          child: const Padding(
+            padding: EdgeInsets.all(4),
+            child: Icon(Icons.close_rounded,
+              color: BMHColors.inkDim, size: 16))),
+      ]));
+  }
+
+  /// Live battery card — mirrors the phone's own battery indicator.
+  Widget _buildBatteryCard() {
+    final c = _batColor;
+    final lvl = _bat.level;
+    final pct = lvl < 0 ? 0.0 : (lvl / 100).clamp(0.0, 1.0);
+    return Container(
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.xl),
+        border: Border.all(color: BMHColors.line)),
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            // Battery glyph with live fill
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                color: c.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(BMHRadius.md),
+                border: Border.all(color: c.withOpacity(0.25))),
+              child: Icon(
+                _bat.charging
+                  ? Icons.battery_charging_full_rounded
+                  : lvl < 0        ? Icons.battery_unknown_rounded
+                  : lvl <= 20      ? Icons.battery_1_bar_rounded
+                  : lvl <= 40      ? Icons.battery_3_bar_rounded
+                  : lvl <= 60      ? Icons.battery_4_bar_rounded
+                  : lvl <= 80      ? Icons.battery_5_bar_rounded
+                  : Icons.battery_full_rounded,
+                color: c, size: 26)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(lvl < 0 ? '—' : '$lvl%',
+                      style: BMHText.heading1.copyWith(
+                        fontSize: 26, height: 1, color: c)),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: BMHPill(
+                        _bat.charging
+                          ? 'Charging'
+                          : lvl < 0 ? 'Reading…'
+                          : lvl <= BatteryService.notifyAt ? 'Very low'
+                          : lvl <= BatteryService.warnAt   ? 'Low'
+                          : 'OK',
+                        type: _bat.charging
+                          ? BMHPillType.success
+                          : lvl >= 0 && lvl <= BatteryService.notifyAt
+                              ? BMHPillType.danger
+                          : lvl >= 0 && lvl <= BatteryService.warnAt
+                              ? BMHPillType.warn
+                              : BMHPillType.success)),
+                  ]),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(BMHRadius.full),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 6,
+                    backgroundColor: BMHColors.bg4,
+                    valueColor: AlwaysStoppedAnimation(c))),
+                const SizedBox(height: 6),
+                Text(
+                  'App alert at ${BatteryService.warnAt}% · notify '
+                  'persons alerted below ${BatteryService.notifyAt}%',
+                  style: BMHText.monoSm.copyWith(
+                    fontSize: 8.5, color: BMHColors.inkMute)),
+              ])),
+          ])),
+        const Divider(height: 1, color: BMHColors.line),
+        _buildTile(Icons.family_restroom_rounded, BMHColors.cyan,
+          'Notify persons',
+          '${_bat.carers.length} of ${BatteryService.maxCarers}',
+          () => Navigator.push(context, MaterialPageRoute(
+            builder: (_) => const BatteryAlertsScreen())),
+          last: true),
+      ]));
   }
 
   Widget _buildSettingsCard(List<Widget> children) => Container(
