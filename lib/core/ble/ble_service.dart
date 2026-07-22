@@ -260,6 +260,45 @@ class BleService extends ChangeNotifier {
   BMHSleepData? get lastSleep => _lastSleep;
   bool get isWearing        => _isWearing;
   bool get wearAsked        => _wearAsked;
+
+  // ── WEAR STATE: "checking" is not the same as "not worn" ──────────────
+  // After every connect the band needs a few seconds to answer our
+  // hardware probe. During that window _isWearing is false simply
+  // because we do not know yet. Screens must not tell the patient to
+  // put the band on during this window — that was the cause of the
+  // false "please wear the band" message that cleared itself a few
+  // seconds later.
+  bool get isWearKnown   => _wearProbeReceived;
+  bool get isWearChecking => isBandConnected && !_wearProbeReceived;
+
+  /// True only when the hardware has actually reported the band is off
+  /// the wrist. Use this to block or warn — never bare !isWearing.
+  bool get isConfirmedOffWrist => _wearProbeReceived && !_isWearing;
+
+  /// Waits for the wear probe to come back, up to [timeout].
+  /// Returns the wear state once known, or the current best guess if
+  /// the band never answers. Call before a measurement so the patient
+  /// sees a short "checking" moment instead of a wrong warning.
+  Future<bool> awaitWearState({
+    Duration timeout = const Duration(seconds: 6),
+  }) async {
+    if (_wearProbeReceived) return _isWearing;
+    // Nudge the band — this is the same probe used at connect.
+    if (_writeChar != null) {
+      try {
+        await _write(_cmd([_BLOOD_O2, 0x00]));
+      } catch (_) {/* probe is best-effort */}
+    }
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (_wearProbeReceived) return _isWearing;
+      if (!isBandConnected) return false;
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+    // Probe never answered. Some bands stay quiet while worn, so do
+    // not claim it is off — let the measurement proceed.
+    return _isWearing;
+  }
   int  get wearScore        => _wearScore;
   bool get isBandConnected  => _connectedBand != null;
   bool get isScaleConnected => _connectedScale != null;

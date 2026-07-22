@@ -260,7 +260,15 @@ class _BandLivePreview extends StatelessWidget {
             unit: 'today', color: BMHColors.sBody,
             icon: Icons.directions_walk_rounded)),
         ]),
-        if (!ble.isWearing && ble.heartRate == 0) ...[
+        // Only prompt once the hardware confirms the band is off the
+        // wrist. While the wear probe is still in flight we say
+        // "checking", so a correctly worn band never gets told off.
+        if (ble.isWearChecking && ble.heartRate == 0) ...[
+          const SizedBox(height: 12),
+          Text('Checking band contact…',
+            style: BMHText.monoSm.copyWith(fontSize: 9),
+            textAlign: TextAlign.center),
+        ] else if (ble.isConfirmedOffWrist && ble.heartRate == 0) ...[
           const SizedBox(height: 12),
           Text('Wear the band to see live readings',
             style: BMHText.monoSm.copyWith(fontSize: 9),

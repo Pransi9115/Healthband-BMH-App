@@ -216,7 +216,9 @@ class _HealthScreenState extends State<HealthScreen>
     if (!_ble.isBandConnected) return;
     // Wear detection is advisory only — the band's slip-hand flag can
     // read false even on the wrist, so it must never block a measure.
-    if (!_ble.isWearing) {
+    // Stay quiet while the probe is still in flight: an unanswered
+    // probe means "unknown", not "not worn".
+    if (_ble.isConfirmedOffWrist) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
           'Tip: keep the band snug on your wrist for the best reading',
@@ -1132,16 +1134,38 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
   Future<void> _measureNow() async {
     if (!_ble.isBandConnected || _isMeasuring) return;
 
-    // Wear check — measuring off-wrist returns garbage
+    // Wear check — measuring off-wrist returns garbage.
+    //
+    // FIX: right after a connect the band has not yet answered our
+    // wear probe, so isWearing reads false even when the band IS on
+    // the wrist. Previously that showed "Please wear the band…" and
+    // then data appeared seconds later, which confused patients.
+    // Now we wait for the hardware to answer, and only warn when it
+    // actually confirms the band is off.
     if (!_ble.isWearing) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Please wear the band on your wrist to measure',
-          style: BMHText.monoSm.copyWith(color: BMHColors.bg0)),
-        backgroundColor: BMHColors.sMetabolic,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(BMHRadius.full))));
-      return;
+      if (_ble.isWearChecking) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Checking band contact…',
+            style: BMHText.monoSm.copyWith(color: BMHColors.bg0)),
+          backgroundColor: BMHColors.cyan,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(BMHRadius.full))));
+        await _ble.awaitWearState();
+        if (!mounted) return;
+      }
+      // Only a confirmed hardware "off wrist" stops the measurement.
+      if (_ble.isConfirmedOffWrist) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Please wear the band on your wrist to measure',
+            style: BMHText.monoSm.copyWith(color: BMHColors.bg0)),
+          backgroundColor: BMHColors.sMetabolic,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(BMHRadius.full))));
+        return;
+      }
     }
     setState(() => _isMeasuring = true);
 

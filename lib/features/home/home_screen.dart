@@ -14,6 +14,7 @@ import 'main_shell.dart';
 import 'daily_checkin_screen.dart';
 import 'biomedical_monitoring_screen.dart';
 import '../diet/diet_screen.dart';
+import '../bioresponse/bioresponse_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -233,6 +234,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: const Icon(Icons.restaurant_menu_outlined),
                       onTap: () => Navigator.push(context, MaterialPageRoute(
                         builder: (_) => const DietScreen()))),
+                    // BioResponse — nutritional score now, biomarkers /
+                    // body composition / gut health to follow.
+                    BMHModuleCard(
+                      title: 'BioResponse',
+                      subtitle: 'Nutrition · Biomarkers · Body · Gut',
+                      signalColor: BMHColors.sGut,
+                      icon: const Icon(Icons.insights_outlined),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => const BioResponseScreen()))),
                     BMHModuleCard(
                       title: 'Bio Care Team',
                       subtitle: 'Doctors · Coaches · Consults',
