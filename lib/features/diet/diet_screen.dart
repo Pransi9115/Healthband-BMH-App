@@ -9,6 +9,10 @@ import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_global_nav.dart';
 import '../../core/diet/diet_models.dart';
 import '../../core/diet/diet_service.dart';
+import '../../core/bioresponse/supplement_service.dart';
+import '../../core/bioresponse/medication_service.dart';
+import 'supplements_screen.dart';
+import 'medications_screen.dart';
 import 'meal_detail_screen.dart';
 import 'micronutrients_screen.dart';
 import 'log_meal_screen.dart';
@@ -21,6 +25,8 @@ class DietScreen extends StatefulWidget {
 
 class _DietScreenState extends State<DietScreen> {
   final _diet = DietService.instance;
+  final _supps = SupplementService.instance;
+  final _meds = MedicationService.instance;
   DateTime _day = DateTime.now();
 
   static const _accent = BMHColors.sMetabolic; // amber, matches home card
@@ -29,7 +35,11 @@ class _DietScreenState extends State<DietScreen> {
   void initState() {
     super.initState();
     _diet.addListener(_onDiet);
+    _supps.addListener(_onDiet);
+    _meds.addListener(_onDiet);
     _diet.init().then((_) => _diet.ensureDay(_day));
+    _supps.init();
+    _meds.init();
   }
 
   void _onDiet() {
@@ -39,6 +49,8 @@ class _DietScreenState extends State<DietScreen> {
   @override
   void dispose() {
     _diet.removeListener(_onDiet);
+    _supps.removeListener(_onDiet);
+    _meds.removeListener(_onDiet);
     super.dispose();
   }
 
@@ -309,6 +321,8 @@ class _DietScreenState extends State<DietScreen> {
                     child: _MealRow(
                       meal: m,
                       accent: _accent,
+                      withSupplements:
+                        _supps.takenWithMeal(_day, m.type.label),
                       onTap: () async {
                         if (m.planned) {
                           await _openLog(preset: m.type, existing: m);
@@ -396,12 +410,100 @@ class _DietScreenState extends State<DietScreen> {
                             fontWeight: FontWeight.w600)),
                       ]))),
 
+                // ── SUPPLEMENTS ─────────────────────
+                // Logged separately from meals: not everyone realises
+                // a meal does not include their tablets, and blood
+                // levels reflect both.
+                const SizedBox(height: 26),
+                _sectionRow('SUPPLEMENTS',
+                  '${_supps.takenCount(_day)} of ${_supps.all.length} '
+                  'taken'),
+                const SizedBox(height: 12),
+                _logCard(
+                  icon: Icons.medication_outlined,
+                  color: _accent,
+                  title: 'Supplements',
+                  subtitle: _supps.all.isEmpty
+                    ? 'Add the tablets and capsules you take'
+                    : _supps.takenOn(_day).isEmpty
+                      ? 'None marked taken ${_isToday ? "today" : "that day"}'
+                      : _supps.takenOn(_day).map((s) => s.name).join(', '),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => SupplementsScreen(day: _day)))),
+
+                // ── MEDICATIONS ─────────────────────
+                const SizedBox(height: 18),
+                _sectionRow('MEDICATIONS',
+                  '${_meds.takenCount(_day)} of ${_meds.all.length} taken'),
+                const SizedBox(height: 12),
+                _logCard(
+                  icon: Icons.local_pharmacy_outlined,
+                  color: BMHColors.sDna,
+                  title: 'Medications',
+                  subtitle: _meds.all.isEmpty
+                    ? 'Some affect how nutrients are absorbed'
+                    : _meds.all.map((m) => m.name).join(', '),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => MedicationsScreen(day: _day)))),
+
                 const SizedBox(height: 120),
               ]))),
         ])),
       ]),
     );
   }
+
+  // ── SECTION HELPERS ─────────────────────────────────────
+  Widget _sectionRow(String title, String trailing) => Row(children: [
+    Expanded(child: Text(title,
+      style: BMHText.monoSm.copyWith(
+        fontSize: 10, letterSpacing: 1.6, color: BMHColors.inkDim))),
+    Text(trailing,
+      style: BMHText.monoSm.copyWith(
+        fontSize: 9, color: BMHColors.inkMute)),
+  ]);
+
+  Widget _logCard({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) =>
+      GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: BMHColors.surface,
+            borderRadius: BorderRadius.circular(BMHRadius.lg),
+            border: Border.all(color: color.withOpacity(0.24))),
+          child: Row(children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(BMHRadius.md),
+                border: Border.all(color: color.withOpacity(0.22))),
+              child: Icon(icon, color: color, size: 20)),
+            const SizedBox(width: 13),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                  style: BMHText.labelLg.copyWith(color: BMHColors.ink)),
+                const SizedBox(height: 3),
+                Text(subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: BMHText.bodySm.copyWith(
+                    fontSize: 10.5, color: BMHColors.inkDim,
+                    height: 1.35)),
+              ])),
+            const Icon(Icons.chevron_right_rounded,
+              color: BMHColors.inkDim, size: 20),
+          ])));
 
   static String _shortName(String n) => switch (n) {
         'Vitamin C'   => 'Vit C',
@@ -492,11 +594,13 @@ class _MealRow extends StatelessWidget {
   final Meal meal;
   final Color accent;
   final VoidCallback onTap;
+  final List<Supplement> withSupplements;
 
   const _MealRow({
     required this.meal,
     required this.accent,
     required this.onTap,
+    this.withSupplements = const [],
   });
 
   IconData get _icon => switch (meal.type) {
@@ -562,6 +666,19 @@ class _MealRow extends StatelessWidget {
                     style: BMHText.monoSm.copyWith(
                       fontSize: 10, color: BMHColors.inkMute))),
                 ]),
+                // Supplements the patient takes with this meal. They
+                // are counted separately, but showing them here makes
+                // the diary read the way the day was actually lived.
+                if (withSupplements.isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    '+ ${withSupplements.map((s) => s.name).join(", ")} '
+                    'taken with this meal',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: BMHText.monoSm.copyWith(
+                      fontSize: 9, color: BMHColors.sGut)),
+                ],
               ],
             ])),
           Icon(Icons.chevron_right_rounded,

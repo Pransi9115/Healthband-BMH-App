@@ -2,14 +2,50 @@ import 'package:flutter/material.dart';
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_global_nav.dart';
+import '../../core/bioresponse/blood_report_service.dart';
+import '../bioresponse/biomarkers_screen.dart';
+import '../bioresponse/blood_report_screen.dart';
 
 /// ─────────────────────────────────────────────────────────
 ///  BIOMEDICAL MONITORING — Blood · GUT · DNA
-///  Informational pages for upcoming lab-based monitoring.
+///  Blood shows the patient's actual panel once their clinic has
+///  uploaded one; GUT and DNA remain informational for now.
+///  The report shown here is the same object BioResponse reads —
+///  one source of truth, displayed in both places.
 /// ─────────────────────────────────────────────────────────
-class BiomedicalMonitoringScreen extends StatelessWidget {
+class BiomedicalMonitoringScreen extends StatefulWidget {
   final String type; // 'Blood' | 'GUT' | 'DNA'
   const BiomedicalMonitoringScreen({super.key, required this.type});
+
+  @override
+  State<BiomedicalMonitoringScreen> createState() =>
+      _BiomedicalMonitoringScreenState();
+}
+
+class _BiomedicalMonitoringScreenState
+    extends State<BiomedicalMonitoringScreen> {
+  final _blood = BloodReportService.instance;
+
+  String get type => widget.type;
+
+  @override
+  void initState() {
+    super.initState();
+    if (type == 'Blood') {
+      _blood.addListener(_refresh);
+      _blood.init();
+    }
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    if (type == 'Blood') _blood.removeListener(_refresh);
+    super.dispose();
+  }
 
   ({String title, String tagline, IconData icon, Color color,
     String intro, List<(IconData, String, String)> features}) get _cfg {
@@ -155,6 +191,14 @@ class BiomedicalMonitoringScreen extends StatelessWidget {
                   ])),
                 const SizedBox(height: 20),
 
+                // ── THE PATIENT'S ACTUAL PANEL ──────
+                // Only on the Blood page, and only once a report
+                // exists. Everything below stays as the explainer.
+                if (type == 'Blood' && _blood.report != null) ...[
+                  _reportCard(context),
+                  const SizedBox(height: 20),
+                ],
+
                 BMHSectionTitle('What you\'ll get'),
                 const SizedBox(height: 12),
                 ...c.features.map((f) => Container(
@@ -216,4 +260,131 @@ class BiomedicalMonitoringScreen extends StatelessWidget {
       ]),
     );
   }
+
+  // ── LATEST PANEL ────────────────────────────────────────
+  Widget _reportCard(BuildContext context) {
+    final r = _blood.report!;
+    return Column(children: [
+      if (_blood.isSample)
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            color: BMHColors.sMetabolic.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(BMHRadius.md),
+            border: Border.all(
+              color: BMHColors.sMetabolic.withOpacity(0.35))),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.science_outlined,
+                color: BMHColors.sMetabolic, size: 15),
+              const SizedBox(width: 10),
+              Expanded(child: Text(
+                'Example panel. Your own results replace this as soon '
+                'as your clinic uploads your blood report.',
+                style: BMHText.bodySm.copyWith(
+                  fontSize: 10.5, color: BMHColors.ink2, height: 1.45))),
+            ])),
+
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: BMHColors.surface,
+          borderRadius: BorderRadius.circular(BMHRadius.xl),
+          border: Border.all(color: BMHColors.sCardio.withOpacity(0.28))),
+        child: Column(children: [
+          Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: BMHColors.sCardio.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(BMHRadius.md),
+                border: Border.all(
+                  color: BMHColors.sCardio.withOpacity(0.22))),
+              child: const Icon(Icons.bloodtype_outlined,
+                color: BMHColors.sCardio, size: 19)),
+            const SizedBox(width: 13),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Your latest panel',
+                  style: BMHText.labelLg.copyWith(color: BMHColors.ink)),
+                const SizedBox(height: 3),
+                Text('${r.testName} · ${fmtDate(r.testDate)}',
+                  style: BMHText.monoSm.copyWith(
+                    fontSize: 9, color: BMHColors.inkDim)),
+              ])),
+          ]),
+          const SizedBox(height: 16),
+          Row(children: [
+            _stat('${r.concernCount}', 'Outside\nrange', BMHColors.danger),
+            _stat('${r.borderlineCount}', 'Border-\nline',
+              BMHColors.sMetabolic),
+            _stat('${r.inRangeCount}', 'In\nrange', BMHColors.success),
+            _stat('${r.totalCount}', 'Total\nmarkers', BMHColors.cyan),
+          ]),
+        ])),
+
+      const SizedBox(height: 12),
+      GestureDetector(
+        onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => BloodReportScreen(report: r))),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(BMHRadius.full),
+            border: Border.all(color: BMHColors.cyan.withOpacity(0.45))),
+          child: Text('View full report',
+            textAlign: TextAlign.center,
+            style: BMHText.labelLg.copyWith(
+              color: BMHColors.cyan, fontWeight: FontWeight.w600)))),
+
+      const SizedBox(height: 12),
+      // Cross-link: the same report, read against what the patient eats.
+      GestureDetector(
+        onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => const BiomarkersScreen())),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: BMHColors.surface,
+            borderRadius: BorderRadius.circular(BMHRadius.lg),
+            border: Border.all(color: BMHColors.cyan.withOpacity(0.24))),
+          child: Row(children: [
+            Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: BMHColors.cyan.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(BMHRadius.md)),
+              child: const Icon(Icons.insights_outlined,
+                color: BMHColors.cyan, size: 17)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('See it against your diet',
+                  style: BMHText.labelMd.copyWith(color: BMHColors.ink)),
+                const SizedBox(height: 2),
+                Text('Opens BioResponse → Biomarkers',
+                  style: BMHText.bodySm.copyWith(
+                    fontSize: 10, color: BMHColors.inkDim)),
+              ])),
+            const Icon(Icons.chevron_right_rounded,
+              color: BMHColors.inkDim, size: 20),
+          ]))),
+    ]);
+  }
+
+  Widget _stat(String v, String l, Color c) => Expanded(child: Column(
+    children: [
+      Text(v, style: BMHText.heading2.copyWith(color: c)),
+      const SizedBox(height: 3),
+      Text(l,
+        textAlign: TextAlign.center,
+        style: BMHText.monoSm.copyWith(
+          fontSize: 8, height: 1.3, color: BMHColors.inkDim)),
+    ]));
 }

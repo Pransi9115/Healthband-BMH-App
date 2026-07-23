@@ -18,6 +18,7 @@
 import '../diet/diet_models.dart';
 import '../diet/diet_service.dart';
 import 'blood_report_service.dart';
+import 'medication_service.dart';
 import 'nutritional_score_service.dart';
 import 'supplement_service.dart';
 
@@ -61,6 +62,9 @@ class BiomarkerLink {
     required this.why,
   });
 
+  /// Every nutrient the app tracks. `bloodKey` is empty for nutrients
+  /// the panel does not measure — those still appear, showing intake
+  /// only, so one tab covers the whole picture.
   static const all = <BiomarkerLink>[
     BiomarkerLink(
       name: 'Vitamin D',
@@ -97,6 +101,17 @@ class BiomarkerLink {
       bloodKey: 'calcium',
       why: 'Blood calcium is tightly controlled by the body, so it stays '
           'steady even when intake changes.'),
+    // Tracked from intake only — not in the standard panel.
+    BiomarkerLink(name: 'Vitamin C', nutrientKey: 'Vitamin C',
+      bloodKey: '', why: ''),
+    BiomarkerLink(name: 'Vitamin A', nutrientKey: 'Vitamin A',
+      bloodKey: '', why: ''),
+    BiomarkerLink(name: 'Zinc', nutrientKey: 'Zinc',
+      bloodKey: '', why: ''),
+    BiomarkerLink(name: 'Potassium', nutrientKey: 'Potassium',
+      bloodKey: '', why: ''),
+    BiomarkerLink(name: 'Omega-3', nutrientKey: 'Omega-3',
+      bloodKey: '', why: ''),
   ];
 }
 
@@ -113,6 +128,11 @@ class LinkResult {
   final String message;
   final int daysWithData;
 
+  /// Active medications documented to affect this nutrient. Never
+  /// added to intake — used only to explain a gap between the two
+  /// sides, and always alongside a pointer to the care team.
+  final List<Medication> medications;
+
   const LinkResult({
     required this.link,
     required this.intakeFromFood,
@@ -124,6 +144,7 @@ class LinkResult {
     required this.verdict,
     required this.message,
     required this.daysWithData,
+    this.medications = const [],
   });
 
   double get intakeTotal => intakeFromFood + intakeFromSupplements;
@@ -144,6 +165,7 @@ class BiomarkerLinkService {
   final _diet = DietService.instance;
   final _supps = SupplementService.instance;
   final _blood = BloodReportService.instance;
+  final _meds = MedicationService.instance;
   final _score = NutritionalScoreService.instance;
 
   /// Food + supplement intake for one nutrient, averaged over the
@@ -179,13 +201,13 @@ class BiomarkerLinkService {
   }
 
   // ── THE INTERPRETATION MATRIX ───────────────────────────
-  (LinkVerdict, String) _interpret(
-      BiomarkerLink link, IntakeLevel intake, BloodMarker? blood) {
+  (LinkVerdict, String) _interpret(BiomarkerLink link, IntakeLevel intake,
+      BloodMarker? blood, List<Medication> meds) {
     if (blood == null || intake == IntakeLevel.none) {
       return (
         LinkVerdict.unknown,
         blood == null
-          ? 'No blood result for ${link.name} in your latest panel.'
+          ? 'Not measured in your latest blood panel — intake only.'
           : 'Log food and supplements to compare your intake against '
             'this blood result.'
       );
@@ -196,21 +218,33 @@ class BiomarkerLinkService {
     final high = b == MarkerStatus.high && !blood.highIsGood;
     final ok = !low && !high;
 
+    // A medication documented to affect this nutrient turns a vague
+    // "absorption may be involved" into something the patient and
+    // their clinician can actually act on.
+    final medLine = meds.isEmpty
+        ? ''
+        : ' You are taking ${_listNames(meds)}, which is documented to '
+          'affect ${link.name.toLowerCase()} levels. Do not change a '
+          'prescription on your own — bring this to your care team.';
+
     if (low && intake == IntakeLevel.low) {
       return (
         LinkVerdict.dietGap,
         'Your ${link.name} intake is below target and your blood level is '
         'low as well. The two agree, which points to intake as the most '
-        'likely cause and the easiest place to start.'
+        'likely cause and the easiest place to start.$medLine'
       );
     }
     if (low && intake != IntakeLevel.low) {
       return (
         LinkVerdict.absorption,
-        'You are getting enough ${link.name} on paper, but your blood '
-        'level is still low. Absorption, medication or other factors may '
-        'be involved — worth raising with your care team rather than '
-        'simply taking more.'
+        meds.isEmpty
+          ? 'You are getting enough ${link.name} on paper, but your blood '
+            'level is still low. Absorption, medication or other factors '
+            'may be involved — worth raising with your care team rather '
+            'than simply taking more.'
+          : 'You are getting enough ${link.name} on paper, but your blood '
+            'level is still low.$medLine'
       );
     }
     if (high && intake == IntakeLevel.high) {
@@ -234,7 +268,7 @@ class BiomarkerLinkService {
         LinkVerdict.watch,
         'Blood ${link.name} is in range even though intake is below '
         'target. Stores can hold for a while — keep an eye on it and '
-        'recheck at the next panel.'
+        'recheck at the next panel.$medLine'
       );
     }
     return (
@@ -242,6 +276,13 @@ class BiomarkerLinkService {
       'Intake is on target and blood ${link.name} sits in range. Nothing '
       'to change here.'
     );
+  }
+
+  static String _listNames(List<Medication> m) {
+    if (m.length == 1) return m.first.name;
+    if (m.length == 2) return '${m[0].name} and ${m[1].name}';
+    return '${m.take(m.length - 1).map((e) => e.name).join(', ')} '
+        'and ${m.last.name}';
   }
 
   LinkResult resultFor(BiomarkerLink link, ScoreRange range,
@@ -252,8 +293,11 @@ class BiomarkerLinkService {
     final i = intakeFor(link.nutrientKey, range, endDay: endDay);
     final total = i.food + i.supps;
     final level = _levelFor(total, target, i.days);
-    final blood = _blood.report?.byKey(link.bloodKey);
-    final (verdict, message) = _interpret(link, level, blood);
+    final blood = link.bloodKey.isEmpty
+        ? null
+        : _blood.report?.byKey(link.bloodKey);
+    final meds = _meds.affecting(link.nutrientKey);
+    final (verdict, message) = _interpret(link, level, blood, meds);
 
     return LinkResult(
       link: link,
@@ -266,18 +310,23 @@ class BiomarkerLinkService {
       verdict: verdict,
       message: message,
       daysWithData: i.days,
+      medications: meds,
     );
   }
 
+  /// Ordered for the Nutrients tab: nutrients with a blood result
+  /// first, since those carry the most information, and within them
+  /// the ones needing attention at the top.
   List<LinkResult> allResults(ScoreRange range, {DateTime? endDay}) {
     final out = BiomarkerLink.all
         .map((l) => resultFor(l, range, endDay: endDay))
         .toList();
-    // Anything needing attention first, then the rest.
     out.sort((a, b) {
-      final aa = a.needsAttention ? 0 : 1;
-      final bb = b.needsAttention ? 0 : 1;
-      return aa.compareTo(bb);
+      final tested = ((b.blood != null) ? 1 : 0) - ((a.blood != null) ? 1 : 0);
+      if (tested != 0) return tested;
+      final attn = (a.needsAttention ? 0 : 1) - (b.needsAttention ? 0 : 1);
+      if (attn != 0) return attn;
+      return a.link.name.compareTo(b.link.name);
     });
     return out;
   }

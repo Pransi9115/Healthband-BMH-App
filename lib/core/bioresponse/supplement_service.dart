@@ -24,6 +24,17 @@ class Supplement {
   final Map<String, double> nutrients;     // Micronutrient name → amount
   final bool active;
 
+  /// Taken every day as a routine. Daily supplements count towards
+  /// intake automatically, so the patient does not have to tick the
+  /// same tablet every morning for the rest of their life. They can
+  /// still untick a specific day they missed it.
+  final bool daily;
+
+  /// Optional meal this is taken with (breakfast/lunch/dinner/snack),
+  /// shown on the meal card so the diary reads the way the day was
+  /// actually lived. Nutrients are still counted separately.
+  final String? withMeal;
+
   const Supplement({
     required this.id,
     required this.name,
@@ -31,6 +42,8 @@ class Supplement {
     this.dose = '',
     this.nutrients = const {},
     this.active = true,
+    this.daily = false,
+    this.withMeal,
   });
 
   Supplement copyWith({
@@ -39,6 +52,9 @@ class Supplement {
     String? dose,
     Map<String, double>? nutrients,
     bool? active,
+    bool? daily,
+    String? withMeal,
+    bool clearMeal = false,
   }) =>
       Supplement(
         id: id,
@@ -47,6 +63,8 @@ class Supplement {
         dose: dose ?? this.dose,
         nutrients: nutrients ?? this.nutrients,
         active: active ?? this.active,
+        daily: daily ?? this.daily,
+        withMeal: clearMeal ? null : (withMeal ?? this.withMeal),
       );
 
   String get summary {
@@ -62,6 +80,7 @@ class Supplement {
   Map<String, dynamic> toJson() => {
         'id': id, 'name': name, 'brand': brand, 'dose': dose,
         'nutrients': nutrients, 'active': active,
+        'daily': daily, 'withMeal': withMeal,
       };
 
   factory Supplement.fromJson(Map<String, dynamic> j) => Supplement(
@@ -72,6 +91,8 @@ class Supplement {
         nutrients: ((j['nutrients'] as Map?) ?? {}).map(
           (k, v) => MapEntry(k as String, (v as num).toDouble())),
         active: j['active'] as bool? ?? true,
+        daily: j['daily'] as bool? ?? false,
+        withMeal: j['withMeal'] as String?,
       );
 }
 
@@ -114,11 +135,16 @@ class SupplementService extends ChangeNotifier {
 
   static const _kList  = 'bmh_supplements_v1';
   static const _kTaken = 'bmh_supplements_taken_v1';
+  static const _kSkip  = 'bmh_supplements_skipped_v1';
 
   SharedPreferences? _prefs;
   List<Supplement> _items = [];
-  /// dayKey → set of supplement ids taken that day.
+  /// dayKey → ids ticked on a day (used by non-daily supplements).
   final Map<String, Set<String>> _taken = {};
+  /// dayKey → ids of DAILY supplements the patient marked as missed.
+  /// Daily items count by default, so we record the exceptions rather
+  /// than asking for a tick every single morning.
+  final Map<String, Set<String>> _skipped = {};
   bool _ready = false;
 
   List<Supplement> get all => List.unmodifiable(_items);
@@ -155,37 +181,81 @@ class SupplementService extends ChangeNotifier {
       } catch (_) {/* start clean */}
     }
 
+    final rawSkip = _prefs!.getString(_kSkip);
+    if (rawSkip != null) {
+      try {
+        (jsonDecode(rawSkip) as Map).forEach((k, v) {
+          _skipped[k as String] = (v as List).cast<String>().toSet();
+        });
+      } catch (_) {/* start clean */}
+    }
+
     _ready = true;
     notifyListeners();
   }
 
   // ── TAKEN LOG ───────────────────────────────────────────
-  bool isTaken(DateTime day, String id) =>
-      _taken[dayKey(day)]?.contains(id) ?? false;
+  Supplement? _byId(String id) {
+    for (final s in _items) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
+  /// A daily supplement counts unless the patient marked that day as
+  /// missed. Everything else counts only when ticked.
+  bool isTaken(DateTime day, String id) {
+    final s = _byId(id);
+    if (s == null) return false;
+    final k = dayKey(day);
+    if (s.daily) return !(_skipped[k]?.contains(id) ?? false);
+    return _taken[k]?.contains(id) ?? false;
+  }
 
   Future<void> setTaken(DateTime day, String id, bool taken) async {
+    final s = _byId(id);
+    if (s == null) return;
     final k = dayKey(day);
-    final set = _taken.putIfAbsent(k, () => <String>{});
-    taken ? set.add(id) : set.remove(id);
-    if (set.isEmpty) _taken.remove(k);
-    await _saveTaken();
+
+    if (s.daily) {
+      // Record the exception: unticking a daily item means "missed".
+      final set = _skipped.putIfAbsent(k, () => <String>{});
+      taken ? set.remove(id) : set.add(id);
+      if (set.isEmpty) _skipped.remove(k);
+      await _saveSkipped();
+    } else {
+      final set = _taken.putIfAbsent(k, () => <String>{});
+      taken ? set.add(id) : set.remove(id);
+      if (set.isEmpty) _taken.remove(k);
+      await _saveTaken();
+    }
     notifyListeners();
   }
 
-  int takenCount(DateTime day) => _taken[dayKey(day)]?.length ?? 0;
+  List<Supplement> takenOn(DateTime day) =>
+      _items.where((s) => s.active && isTaken(day, s.id)).toList();
+
+  /// Supplements taken with a particular meal — lets the meal card
+  /// show "+ Folic acid taken with this meal".
+  List<Supplement> takenWithMeal(DateTime day, String mealLabel) =>
+      takenOn(day)
+          .where((s) => (s.withMeal ?? '').toLowerCase() ==
+              mealLabel.toLowerCase())
+          .toList();
+
+  int takenCount(DateTime day) => takenOn(day).length;
 
   /// Nutrients supplied by supplements actually taken on [day].
   Map<String, double> microsFor(DateTime day) {
     final out = <String, double>{};
-    final ids = _taken[dayKey(day)] ?? const <String>{};
-    for (final s in _items.where((s) => ids.contains(s.id))) {
+    for (final s in takenOn(day)) {
       s.nutrients.forEach((k, v) => out[k] = (out[k] ?? 0) + v);
     }
     return out;
   }
 
   /// True if anything at all was taken on [day].
-  bool hasDataOn(DateTime day) => (_taken[dayKey(day)] ?? const {}).isNotEmpty;
+  bool hasDataOn(DateTime day) => takenOn(day).isNotEmpty;
 
   // ── CRUD ────────────────────────────────────────────────
   Future<void> add(Supplement s) async {
@@ -207,8 +277,12 @@ class SupplementService extends ChangeNotifier {
     for (final set in _taken.values) {
       set.remove(id);
     }
+    for (final set in _skipped.values) {
+      set.remove(id);
+    }
     await _save();
     await _saveTaken();
+    await _saveSkipped();
     notifyListeners();
   }
 
@@ -217,4 +291,7 @@ class SupplementService extends ChangeNotifier {
 
   Future<void> _saveTaken() async => _prefs?.setString(
       _kTaken, jsonEncode(_taken.map((k, v) => MapEntry(k, v.toList()))));
+
+  Future<void> _saveSkipped() async => _prefs?.setString(
+      _kSkip, jsonEncode(_skipped.map((k, v) => MapEntry(k, v.toList()))));
 }
