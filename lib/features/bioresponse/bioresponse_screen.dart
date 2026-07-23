@@ -11,6 +11,7 @@ import '../../shared/widgets/bmh_widgets.dart';
 import '../../core/bioresponse/nutritional_score_service.dart';
 import '../../core/diet/diet_service.dart';
 import 'nutritional_score_screen.dart';
+import 'biomarkers_screen.dart';
 
 class BioResponseScreen extends StatefulWidget {
   const BioResponseScreen({super.key});
@@ -97,10 +98,11 @@ class _BioResponseScreenState extends State<BioResponseScreen> {
                 // ── 2–4. COMING SOON ────────────────
                 _AreaCard(
                   title: 'Biomarkers',
-                  subtitle: 'Blood panels, ranges and trends',
+                  subtitle: 'Intake vs blood · food, supplements, panel',
                   icon: Icons.bloodtype_outlined,
                   color: BMHColors.sCardio,
-                  comingSoon: true),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => BiomarkersScreen(initialRange: _range)))),
                 const SizedBox(height: 12),
                 _AreaCard(
                   title: 'Body composition',
