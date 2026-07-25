@@ -77,7 +77,9 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>BMH App uses your location in the background to stay connected to your health band and sync data continuously.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>BMH App uses the camera to scan QR codes for pairing your health band device.</string>
+	<string>BMH App uses the camera to scan QR codes for pairing your health band and to take a profile photo.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>BMH App accesses your photo library so you can choose a profile photo.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>BMH App uses motion data to track your steps and activity.</string>
 	<key>UIBackgroundModes</key>

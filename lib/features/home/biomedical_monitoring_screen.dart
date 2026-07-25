@@ -5,13 +5,19 @@ import '../../shared/widgets/bmh_global_nav.dart';
 import '../../core/bioresponse/blood_report_service.dart';
 import '../bioresponse/biomarkers_screen.dart';
 import '../bioresponse/blood_report_screen.dart';
+import '../bioresponse/blood_report_format.dart';
 
 /// ─────────────────────────────────────────────────────────
 ///  BIOMEDICAL MONITORING — Blood · GUT · DNA
-///  Blood shows the patient's actual panel once their clinic has
-///  uploaded one; GUT and DNA remain informational for now.
-///  The report shown here is the same object BioResponse reads —
-///  one source of truth, displayed in both places.
+///
+///  Blood shows the patient's actual panel in the same report
+///  format BioResponse → Biomarkers uses — one source of truth,
+///  one presentation, wherever it is opened from. GUT and DNA stay
+///  informational until their data sources are wired in.
+///
+///  Text is BMHColors.ink (white) throughout; only trailing
+///  provenance lines drop to ink2, so nothing reads as dim grey on
+///  the dark theme.
 /// ─────────────────────────────────────────────────────────
 class BiomedicalMonitoringScreen extends StatefulWidget {
   final String type; // 'Blood' | 'GUT' | 'DNA'
@@ -48,7 +54,7 @@ class _BiomedicalMonitoringScreenState
   }
 
   ({String title, String tagline, IconData icon, Color color,
-    String intro, List<(IconData, String, String)> features}) get _cfg {
+    String intro, List<(IconData, String)> features}) get _cfg {
     switch (type) {
       case 'Blood':
         return (
@@ -58,19 +64,11 @@ class _BiomedicalMonitoringScreenState
           color: BMHColors.sCardio,
           intro: 'Periodic blood panels reveal what wearables cannot — '
               'from cholesterol and blood sugar control to vitamin '
-              'levels and inflammation markers. Combined with your '
-              'band\'s continuous data, they complete your health '
-              'picture.',
+              'levels and inflammation markers.',
           features: [
-            (Icons.water_drop_outlined, 'Lipid Profile',
-              'Cholesterol, HDL, LDL and triglycerides — key markers '
-              'of cardiovascular health.'),
-            (Icons.cake_outlined, 'Metabolic Panel',
-              'HbA1c and fasting glucose to track long-term blood '
-              'sugar control.'),
-            (Icons.shield_outlined, 'Inflammation & Vitamins',
-              'CRP, Vitamin D, B12 and iron — the hidden drivers of '
-              'energy and immunity.'),
+            (Icons.water_drop_outlined, 'Lipid Profile'),
+            (Icons.cake_outlined, 'Metabolic Panel'),
+            (Icons.shield_outlined, 'Inflammation & Vitamins'),
           ]);
       case 'GUT':
         return (
@@ -83,15 +81,9 @@ class _BiomedicalMonitoringScreenState
               'bacteria in your gut and turns it into practical food '
               'and lifestyle guidance.',
           features: [
-            (Icons.pie_chart_outline_rounded, 'Diversity Score',
-              'How rich and balanced your gut bacteria are — a core '
-              'marker of gut health.'),
-            (Icons.restaurant_outlined, 'Food Response',
-              'Personalized guidance on fibres, probiotics and foods '
-              'your gut thrives on.'),
-            (Icons.mood_outlined, 'Gut–Brain Axis',
-              'How your microbiome links to stress, mood and sleep '
-              'quality tracked by your band.'),
+            (Icons.pie_chart_outline_rounded, 'Diversity Score'),
+            (Icons.restaurant_outlined, 'Food Response'),
+            (Icons.mood_outlined, 'Gut–Brain Axis'),
           ]);
       default: // DNA
         return (
@@ -104,15 +96,9 @@ class _BiomedicalMonitoringScreenState
               'sleep. Paired with your live band data, it enables '
               'truly personalized health guidance.',
           features: [
-            (Icons.fitness_center_outlined, 'Fitness Genetics',
-              'Endurance vs power profile, recovery speed and injury '
-              'susceptibility.'),
-            (Icons.restaurant_menu_outlined, 'Nutrigenomics',
-              'Caffeine, lactose and carb sensitivity — eat for your '
-              'genotype.'),
-            (Icons.nightlight_outlined, 'Sleep & Rhythm',
-              'Chronotype and sleep-depth tendencies, matched against '
-              'your real sleep data.'),
+            (Icons.fitness_center_outlined, 'Fitness Genetics'),
+            (Icons.restaurant_menu_outlined, 'Nutrigenomics'),
+            (Icons.nightlight_outlined, 'Sleep & Rhythm'),
           ]);
     }
   }
@@ -120,6 +106,8 @@ class _BiomedicalMonitoringScreenState
   @override
   Widget build(BuildContext context) {
     final c = _cfg;
+    final hasReport = type == 'Blood' && _blood.report != null;
+
     return Scaffold(
       backgroundColor: BMHColors.bg0,
       bottomNavigationBar: const BMHGlobalNav(activeIndex: 0),
@@ -155,105 +143,17 @@ class _BiomedicalMonitoringScreenState
               children: [
                 const SizedBox(height: 12),
 
-                // Hero
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        c.color.withOpacity(0.14),
-                        c.color.withOpacity(0.02)]),
-                    borderRadius: BorderRadius.circular(BMHRadius.xl),
-                    border: Border.all(
-                      color: c.color.withOpacity(0.3))),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                    Container(
-                      width: 56, height: 56,
-                      decoration: BoxDecoration(
-                        color: c.color.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: c.color.withOpacity(0.25))),
-                      child: Icon(c.icon, color: c.color, size: 26)),
-                    const SizedBox(height: 14),
-                    Text(c.tagline,
-                      style: BMHText.heading2.copyWith(
-                        fontStyle: FontStyle.italic, color: c.color)),
-                    const SizedBox(height: 8),
-                    Text(c.intro,
-                      style: BMHText.bodySm.copyWith(
-                        color: BMHColors.ink2, height: 1.6)),
-                  ])),
-                const SizedBox(height: 20),
+                // ── HERO — slimmer, tighter, white body copy ──
+                _Hero(cfg: c),
+                const SizedBox(height: 18),
 
-                // ── THE PATIENT'S ACTUAL PANEL ──────
-                // Only on the Blood page, and only once a report
-                // exists. Everything below stays as the explainer.
-                if (type == 'Blood' && _blood.report != null) ...[
-                  _reportCard(context),
-                  const SizedBox(height: 20),
-                ],
+                if (hasReport)
+                  // The actual panel, in the shared report format.
+                  ..._bloodReport(context)
+                else
+                  // Explainer for GUT / DNA (and Blood before upload).
+                  ..._explainer(c),
 
-                BMHSectionTitle('What you\'ll get'),
-                const SizedBox(height: 12),
-                ...c.features.map((f) => Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: BMHColors.surface,
-                    borderRadius: BorderRadius.circular(BMHRadius.lg),
-                    border: Border.all(color: BMHColors.line)),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                    Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        color: c.color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: c.color.withOpacity(0.22))),
-                      child: Icon(f.$1, color: c.color, size: 18)),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                      Text(f.$2, style: BMHText.labelMd),
-                      const SizedBox(height: 3),
-                      Text(f.$3,
-                        style: BMHText.monoSm.copyWith(
-                          fontSize: 9, color: Colors.white,
-                          height: 1.5)),
-                    ])),
-                  ]))),
-                const SizedBox(height: 8),
-
-                // Coming soon banner
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: c.color.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(BMHRadius.lg),
-                    border: Border.all(
-                      color: c.color.withOpacity(0.25))),
-                  child: Row(children: [
-                    Icon(Icons.schedule_rounded,
-                      color: c.color, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(
-                      'Lab kit integration is coming soon. Your band '
-                      'data keeps building your baseline in the '
-                      'meantime.',
-                      style: BMHText.monoSm.copyWith(
-                        fontSize: 9, color: BMHColors.ink,
-                        height: 1.4))),
-                  ])),
                 const SizedBox(height: 120),
               ]))),
         ])),
@@ -261,130 +161,234 @@ class _BiomedicalMonitoringScreenState
     );
   }
 
-  // ── LATEST PANEL ────────────────────────────────────────
-  Widget _reportCard(BuildContext context) {
+  // ── BLOOD — the full report, same format as Biomarkers ──
+  List<Widget> _bloodReport(BuildContext context) {
     final r = _blood.report!;
-    return Column(children: [
-      if (_blood.isSample)
+    final flagged = r.flagged;
+
+    return [
+      ReportMasthead(report: r),
+      const SizedBox(height: 16),
+      ReportCounts(report: r),
+
+      const SizedBox(height: 18),
+      BloodReportOutlineButton(
+        label: 'VIEW FULL REPORT',
+        onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => BloodReportScreen(report: r)))),
+
+      const SizedBox(height: 12),
+      _dietCrossLink(context),
+
+      if (r.threads.isNotEmpty) ...[
+        const SizedBox(height: 24),
+        BMHSectionTitle('Read this first'),
+        const SizedBox(height: 12),
+        ReportThreads(report: r),
+      ],
+
+      // ── TRENDING PATTERN — a dot per marker in each body system,
+      //    placed by where it sits in its own reference range and
+      //    joined into a line. Drawn straight from the report.
+      const SizedBox(height: 24),
+      BMHSectionTitle('Pattern across the panel'),
+      const SizedBox(height: 6),
+      Text(
+        'Each dot is one marker, placed by where it sits inside its '
+        'reference range. The band down the middle is where a result '
+        'should land.',
+        style: BMHText.bodySm.copyWith(
+          fontSize: 11, color: BMHColors.ink, height: 1.5)),
+      const SizedBox(height: 14),
+      for (final g in r.groups) ...[
+        _TrendGroup(group: g, markers: r.inGroup(g)),
+        const SizedBox(height: 10),
+      ],
+
+      const SizedBox(height: 12),
+      BMHSectionTitle('What the report flagged'),
+      const SizedBox(height: 10),
+      Text(
+        flagged.isEmpty
+          ? 'Every marker in this panel sits inside its reference range.'
+          : '${r.outsideRangeCount} of ${r.totalCount} markers fell '
+            'outside the laboratory reference range. Tap any one to read '
+            'what it means and what you can do.',
+        style: BMHText.bodySm.copyWith(
+          fontSize: 11, color: BMHColors.ink, height: 1.5)),
+      const SizedBox(height: 12),
+      const ReportLegend(),
+      const SizedBox(height: 14),
+      for (final m in flagged) ...[
+        ReportMarkerRow(marker: m),
+        const SizedBox(height: 9),
+      ],
+
+      if (r.steps.isNotEmpty) ...[
+        const SizedBox(height: 22),
+        BMHSectionTitle('What to do next'),
+        const SizedBox(height: 6),
+        Text('In the order that makes the most difference.',
+          style: BMHText.bodySm.copyWith(
+            fontSize: 11, color: BMHColors.ink)),
+        const SizedBox(height: 12),
+        ReportSteps(report: r),
+      ],
+
+      const SizedBox(height: 18),
+      ReportDisclaimer(report: r),
+    ];
+  }
+
+  Widget _dietCrossLink(BuildContext context) => GestureDetector(
+    onTap: () => Navigator.push(context, MaterialPageRoute(
+      builder: (_) => const BiomarkersScreen())),
+    behavior: HitTestBehavior.opaque,
+    child: Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: BMHColors.cyan.withOpacity(0.24))),
+      child: Row(children: [
         Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(13),
+          width: 36, height: 36,
           decoration: BoxDecoration(
-            color: BMHColors.sMetabolic.withOpacity(0.10),
-            borderRadius: BorderRadius.circular(BMHRadius.md),
-            border: Border.all(
-              color: BMHColors.sMetabolic.withOpacity(0.35))),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.science_outlined,
-                color: BMHColors.sMetabolic, size: 15),
-              const SizedBox(width: 10),
-              Expanded(child: Text(
-                'Example panel. Your own results replace this as soon '
-                'as your clinic uploads your blood report.',
-                style: BMHText.bodySm.copyWith(
-                  fontSize: 10.5, color: BMHColors.ink2, height: 1.45))),
-            ])),
+            color: BMHColors.cyan.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(BMHRadius.md)),
+          child: const Icon(Icons.insights_outlined,
+            color: BMHColors.cyan, size: 17)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('See it against your diet',
+              style: BMHText.labelMd.copyWith(color: BMHColors.ink)),
+            const SizedBox(height: 2),
+            Text('Opens BioResponse → Biomarkers',
+              style: BMHText.bodySm.copyWith(
+                fontSize: 10, color: BMHColors.ink2)),
+          ])),
+        const Icon(Icons.chevron_right_rounded,
+          color: BMHColors.ink2, size: 20),
+      ])));
 
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: BMHColors.surface,
-          borderRadius: BorderRadius.circular(BMHRadius.xl),
-          border: Border.all(color: BMHColors.sCardio.withOpacity(0.28))),
-        child: Column(children: [
-          Row(children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: BMHColors.sCardio.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(BMHRadius.md),
-                border: Border.all(
-                  color: BMHColors.sCardio.withOpacity(0.22))),
-              child: const Icon(Icons.bloodtype_outlined,
-                color: BMHColors.sCardio, size: 19)),
-            const SizedBox(width: 13),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Your latest panel',
-                  style: BMHText.labelLg.copyWith(color: BMHColors.ink)),
-                const SizedBox(height: 3),
-                Text('${r.testName} · ${fmtDate(r.testDate)}',
-                  style: BMHText.monoSm.copyWith(
-                    fontSize: 9, color: BMHColors.inkDim)),
-              ])),
-          ]),
-          const SizedBox(height: 16),
-          Row(children: [
-            _stat('${r.concernCount}', 'Outside\nrange', BMHColors.danger),
-            _stat('${r.borderlineCount}', 'Border-\nline',
-              BMHColors.sMetabolic),
-            _stat('${r.inRangeCount}', 'In\nrange', BMHColors.success),
-            _stat('${r.totalCount}', 'Total\nmarkers', BMHColors.cyan),
-          ]),
-        ])),
-
+  // ── GUT / DNA — lean explainer, white text, no coming-soon note ──
+  List<Widget> _explainer(
+      ({String title, String tagline, IconData icon, Color color,
+        String intro, List<(IconData, String)> features}) c) {
+    return [
+      BMHSectionTitle('What you\'ll get'),
       const SizedBox(height: 12),
-      GestureDetector(
-        onTap: () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => BloodReportScreen(report: r))),
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(BMHRadius.full),
-            border: Border.all(color: BMHColors.cyan.withOpacity(0.45))),
-          child: Text('View full report',
-            textAlign: TextAlign.center,
-            style: BMHText.labelLg.copyWith(
-              color: BMHColors.cyan, fontWeight: FontWeight.w600)))),
-
-      const SizedBox(height: 12),
-      // Cross-link: the same report, read against what the patient eats.
-      GestureDetector(
-        onTap: () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => const BiomarkersScreen())),
-        behavior: HitTestBehavior.opaque,
-        child: Container(
+      for (final f in c.features)
+        Container(
+          margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: BMHColors.surface,
             borderRadius: BorderRadius.circular(BMHRadius.lg),
-            border: Border.all(color: BMHColors.cyan.withOpacity(0.24))),
+            border: Border.all(color: BMHColors.line)),
           child: Row(children: [
             Container(
-              width: 36, height: 36,
+              width: 40, height: 40,
               decoration: BoxDecoration(
-                color: BMHColors.cyan.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(BMHRadius.md)),
-              child: const Icon(Icons.insights_outlined,
-                color: BMHColors.cyan, size: 17)),
+                color: c.color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: c.color.withOpacity(0.22))),
+              child: Icon(f.$1, color: c.color, size: 18)),
             const SizedBox(width: 12),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('See it against your diet',
-                  style: BMHText.labelMd.copyWith(color: BMHColors.ink)),
-                const SizedBox(height: 2),
-                Text('Opens BioResponse → Biomarkers',
-                  style: BMHText.bodySm.copyWith(
-                    fontSize: 10, color: BMHColors.inkDim)),
-              ])),
-            const Icon(Icons.chevron_right_rounded,
-              color: BMHColors.inkDim, size: 20),
-          ]))),
-    ]);
+            Expanded(child: Text(f.$2,
+              style: BMHText.labelMd.copyWith(color: BMHColors.ink))),
+          ])),
+    ];
   }
+}
 
-  Widget _stat(String v, String l, Color c) => Expanded(child: Column(
-    children: [
-      Text(v, style: BMHText.heading2.copyWith(color: c)),
-      const SizedBox(height: 3),
-      Text(l,
-        textAlign: TextAlign.center,
-        style: BMHText.monoSm.copyWith(
-          fontSize: 8, height: 1.3, color: BMHColors.inkDim)),
-    ]));
+// ─────────────────────────────────────────────────────────
+//  HERO — compact, so the card stays neat and the report sits
+//  higher up the page.
+// ─────────────────────────────────────────────────────────
+class _Hero extends StatelessWidget {
+  final ({String title, String tagline, IconData icon, Color color,
+    String intro, List<(IconData, String)> features}) cfg;
+  const _Hero({required this.cfg});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = cfg;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            c.color.withOpacity(0.14),
+            c.color.withOpacity(0.02)]),
+        borderRadius: BorderRadius.circular(BMHRadius.xl),
+        border: Border.all(color: c.color.withOpacity(0.3))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: c.color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: c.color.withOpacity(0.25))),
+              child: Icon(c.icon, color: c.color, size: 20)),
+            const SizedBox(width: 12),
+            Expanded(child: Text(c.tagline,
+              style: BMHText.heading3.copyWith(
+                fontStyle: FontStyle.italic, color: c.color))),
+          ]),
+          const SizedBox(height: 10),
+          Text(c.intro,
+            style: BMHText.bodySm.copyWith(
+              fontSize: 11.5, color: BMHColors.ink, height: 1.55)),
+        ]));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  TREND GROUP — one body system's markers as a dotted pattern
+// ─────────────────────────────────────────────────────────
+class _TrendGroup extends StatelessWidget {
+  final String group;
+  final List<BloodMarker> markers;
+  const _TrendGroup({required this.group, required this.markers});
+
+  @override
+  Widget build(BuildContext context) {
+    final flaggedCount = markers
+        .where((m) => m.isConcern || m.status == MarkerStatus.borderline)
+        .length;
+    final tone = flaggedCount > 0 ? BMHColors.sMetabolic : BMHColors.sGut;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: BMHColors.line)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(child: Text(group,
+              style: BMHText.labelMd.copyWith(
+                fontSize: 12, color: BMHColors.ink))),
+            Text(
+              flaggedCount == 0
+                ? 'all in range'
+                : '$flaggedCount to watch',
+              style: BMHText.monoSm.copyWith(
+                fontSize: 8.5, color: tone, fontWeight: FontWeight.w700)),
+          ]),
+          const SizedBox(height: 8),
+          TrendDots(markers: markers, color: tone),
+        ]));
+  }
 }

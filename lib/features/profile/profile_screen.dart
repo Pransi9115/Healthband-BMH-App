@@ -6,6 +6,7 @@ import '../settings/legal_screen.dart';
 import '../auth/welcome_screen.dart';
 import '../../core/auth/auth_service.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
@@ -50,6 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   String _gender = 'Male';
   double _height = 170;
   double _weight = 70;
+  String? _avatarPath;   // saved profile photo, if any
 
   @override
   void initState() {
@@ -83,6 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       _gender = p.getString('profile_gender')  ?? 'Male';
       _height = p.getDouble('profile_height')  ?? 170;
       _weight = p.getDouble('profile_weight')  ?? 70;
+      _avatarPath = p.getString('profile_avatar');
     });
   }
 
@@ -93,6 +96,141 @@ class _ProfileScreenState extends State<ProfileScreen>
     await p.setString('profile_gender', _gender);
     await p.setDouble('profile_height', _height);
     await p.setDouble('profile_weight', _weight);
+  }
+
+  // ── PROFILE PHOTO ────────────────────────────────────────
+  // Add from the gallery or take a new one with the camera. The
+  // chosen file's path is persisted so it survives restarts.
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85);
+      if (file == null) return;
+      final p = await SharedPreferences.getInstance();
+      await p.setString('profile_avatar', file.path);
+      if (mounted) setState(() => _avatarPath = file.path);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not open the camera or gallery.')));
+      }
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    final p = await SharedPreferences.getInstance();
+    await p.remove('profile_avatar');
+    if (mounted) setState(() => _avatarPath = null);
+  }
+
+  void _showPhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: BMHColors.bg2,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(BMHRadius.xl))),
+      builder: (ctx) => SafeArea(child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: BMHColors.inkMute,
+                borderRadius: BorderRadius.circular(2)))),
+            Text('Profile photo', style: BMHText.heading3),
+            const SizedBox(height: 14),
+            _photoOption(Icons.photo_camera_outlined, 'Take a photo', () {
+              Navigator.pop(ctx);
+              _pickPhoto(ImageSource.camera);
+            }),
+            const SizedBox(height: 10),
+            _photoOption(Icons.photo_library_outlined,
+              'Choose from gallery', () {
+              Navigator.pop(ctx);
+              _pickPhoto(ImageSource.gallery);
+            }),
+            if (_avatarPath != null) ...[
+              const SizedBox(height: 10),
+              _photoOption(Icons.delete_outline_rounded, 'Remove photo', () {
+                Navigator.pop(ctx);
+                _removePhoto();
+              }, danger: true),
+            ],
+          ]))));
+  }
+
+  Widget _photoOption(IconData ic, String label, VoidCallback onTap,
+      {bool danger = false}) {
+    final c = danger ? BMHColors.sCardio : BMHColors.cyan;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: BMHColors.surface,
+          borderRadius: BorderRadius.circular(BMHRadius.lg),
+          border: Border.all(color: BMHColors.line)),
+        child: Row(children: [
+          Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(
+              color: c.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(BMHRadius.md),
+              border: Border.all(color: c.withOpacity(0.25))),
+            child: Icon(ic, color: c, size: 19)),
+          const SizedBox(width: 13),
+          Text(label,
+            style: BMHText.labelLg.copyWith(
+              color: danger ? c : BMHColors.ink)),
+        ])));
+  }
+
+  // Avatar circle — shows the photo if set, otherwise the default.
+  Widget _avatar() {
+    final hasPhoto =
+        _avatarPath != null && File(_avatarPath!).existsSync();
+    return GestureDetector(
+      onTap: _showPhotoOptions,
+      behavior: HitTestBehavior.opaque,
+      child: Stack(children: [
+        Container(
+          width: 64, height: 64,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: BMHColors.cyan.withOpacity(0.12),
+            border: Border.all(
+              color: BMHColors.cyan.withOpacity(0.3), width: 2),
+            image: hasPhoto
+              ? DecorationImage(
+                  image: FileImage(File(_avatarPath!)),
+                  fit: BoxFit.cover)
+              : null),
+          child: hasPhoto
+            ? null
+            : const Center(
+                child: Text('👤', style: TextStyle(fontSize: 28)))),
+        Positioned(
+          right: 0, bottom: 0,
+          child: Container(
+            width: 22, height: 22,
+            decoration: BoxDecoration(
+              color: BMHColors.cyan,
+              shape: BoxShape.circle,
+              border: Border.all(color: BMHColors.bg0, width: 2)),
+            child: const Icon(Icons.camera_alt_rounded,
+              color: BMHColors.bg0, size: 11))),
+      ]));
   }
 
   @override
@@ -131,15 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   borderRadius: BorderRadius.circular(BMHRadius.xl),
                   border: Border.all(color: BMHColors.cyan.withOpacity(0.2))),
                 child: Row(children: [
-                  Container(
-                    width: 64, height: 64,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: BMHColors.cyan.withOpacity(0.12),
-                      border: Border.all(
-                        color: BMHColors.cyan.withOpacity(0.3), width: 2)),
-                    child: const Center(
-                      child: Text('👤', style: TextStyle(fontSize: 28)))),
+                  _avatar(),
                   const SizedBox(width: 16),
                   Expanded(child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

@@ -35,6 +35,16 @@ class Supplement {
   /// actually lived. Nutrients are still counted separately.
   final String? withMeal;
 
+  /// How many times a day the daily dose is taken — one tablet in the
+  /// morning is 1, a morning-and-night routine is 2, and so on. Kept
+  /// with the supplement so "daily dose · twice a day" reads correctly
+  /// on the card.
+  final int timesPerDay;
+
+  /// Taken with a glass of water — a common instruction for tablets
+  /// and a useful reminder, shown alongside the meal on the card.
+  final bool withWater;
+
   const Supplement({
     required this.id,
     required this.name,
@@ -44,6 +54,8 @@ class Supplement {
     this.active = true,
     this.daily = false,
     this.withMeal,
+    this.timesPerDay = 1,
+    this.withWater = false,
   });
 
   Supplement copyWith({
@@ -55,6 +67,8 @@ class Supplement {
     bool? daily,
     String? withMeal,
     bool clearMeal = false,
+    int? timesPerDay,
+    bool? withWater,
   }) =>
       Supplement(
         id: id,
@@ -65,6 +79,8 @@ class Supplement {
         active: active ?? this.active,
         daily: daily ?? this.daily,
         withMeal: clearMeal ? null : (withMeal ?? this.withMeal),
+        timesPerDay: timesPerDay ?? this.timesPerDay,
+        withWater: withWater ?? this.withWater,
       );
 
   String get summary {
@@ -81,6 +97,7 @@ class Supplement {
         'id': id, 'name': name, 'brand': brand, 'dose': dose,
         'nutrients': nutrients, 'active': active,
         'daily': daily, 'withMeal': withMeal,
+        'timesPerDay': timesPerDay, 'withWater': withWater,
       };
 
   factory Supplement.fromJson(Map<String, dynamic> j) => Supplement(
@@ -93,6 +110,8 @@ class Supplement {
         active: j['active'] as bool? ?? true,
         daily: j['daily'] as bool? ?? false,
         withMeal: j['withMeal'] as String?,
+        timesPerDay: (j['timesPerDay'] as num?)?.toInt() ?? 1,
+        withWater: j['withWater'] as bool? ?? false,
       );
 }
 

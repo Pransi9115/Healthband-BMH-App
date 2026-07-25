@@ -12,6 +12,7 @@ import '../../core/bioresponse/nutritional_score_service.dart';
 import '../../core/diet/diet_service.dart';
 import 'nutritional_score_screen.dart';
 import 'biomarkers_screen.dart';
+import 'body_composition_screen.dart';
 
 class BioResponseScreen extends StatefulWidget {
   const BioResponseScreen({super.key});
@@ -106,10 +107,11 @@ class _BioResponseScreenState extends State<BioResponseScreen> {
                 const SizedBox(height: 12),
                 _AreaCard(
                   title: 'Body composition',
-                  subtitle: 'Lean mass, fat mass and hydration',
+                  subtitle: 'Lean mass, fat mass and how it responds',
                   icon: Icons.accessibility_new_outlined,
                   color: BMHColors.sBody,
-                  comingSoon: true),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const BodyCompositionScreen()))),
                 const SizedBox(height: 12),
                 _AreaCard(
                   title: 'Gut health',

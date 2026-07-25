@@ -78,6 +78,13 @@ class _SupplementsScreenState extends State<SupplementsScreen> {
     final nutrients = Map<String, double>.from(existing?.nutrients ?? {});
     var daily = existing?.daily ?? true;      // routine is the common case
     String? withMeal = existing?.withMeal;
+    var timesPerDay = existing?.timesPerDay ?? 1;
+    var withWater = existing?.withWater ?? false;
+    // Which preset is selected in the dropdown, or null for "Custom".
+    String? presetName = existing == null
+      ? null
+      : (SupplementPreset.all.any((p) => p.name == existing.name)
+          ? existing.name : null);
     String? error;
 
     await showModalBottomSheet(
@@ -105,41 +112,59 @@ class _SupplementsScreenState extends State<SupplementsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(existing == null ? 'Add supplement' : 'Edit supplement',
-                style: BMHText.heading2),
+              Center(child: Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: BMHColors.inkMute,
+                  borderRadius: BorderRadius.circular(2)))),
+              Row(children: [
+                Expanded(child: Text(
+                  existing == null ? 'Add supplement' : 'Edit supplement',
+                  style: BMHText.heading2)),
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      color: BMHColors.bg3,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: BMHColors.line)),
+                    child: const Icon(Icons.close_rounded,
+                      color: BMHColors.ink2, size: 17))),
+              ]),
               const SizedBox(height: 4),
               Text('Nutrient amounts feed your intake totals, so keep them '
                    'as close to the label as you can.',
                 style: BMHText.bodySm.copyWith(
-                  fontSize: 11, color: BMHColors.inkDim, height: 1.4)),
+                  fontSize: 11, color: BMHColors.ink2, height: 1.4)),
 
-              if (existing == null) ...[
-                const SizedBox(height: 16),
-                Text('COMMON ONES',
-                  style: BMHText.monoSm.copyWith(
-                    fontSize: 8.5, letterSpacing: 1.3,
-                    color: BMHColors.inkDim)),
-                const SizedBox(height: 8),
-                Wrap(spacing: 7, runSpacing: 7, children: [
-                  for (final p in SupplementPreset.all)
-                    GestureDetector(
-                      onTap: () => applyPreset(p),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 11, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: _accent.withOpacity(0.08),
-                          borderRadius:
-                            BorderRadius.circular(BMHRadius.full),
-                          border: Border.all(
-                            color: _accent.withOpacity(0.25))),
-                        child: Text(p.name,
-                          style: BMHText.monoSm.copyWith(
-                            fontSize: 9.5, color: _accent)))),
-                ]),
-              ],
+              const SizedBox(height: 16),
+              Text('CHOOSE A SUPPLEMENT',
+                style: BMHText.monoSm.copyWith(
+                  fontSize: 8.5, letterSpacing: 1.3,
+                  color: BMHColors.inkDim)),
+              const SizedBox(height: 6),
+              _SupplementDropdown(
+                value: presetName,
+                onChanged: (v) {
+                  if (v == null) {
+                    // Custom — clear back to a blank, typeable form.
+                    setSheet(() {
+                      presetName = null;
+                      nameC.clear();
+                      nutrients.clear();
+                    });
+                  } else {
+                    final p =
+                      SupplementPreset.all.firstWhere((x) => x.name == v);
+                    presetName = v;
+                    applyPreset(p);
+                  }
+                }),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
               _field(nameC, 'Name *', 'e.g. Vitamin D3'),
               const SizedBox(height: 12),
               Row(children: [
@@ -199,7 +224,15 @@ class _SupplementsScreenState extends State<SupplementsScreen> {
                             shape: BoxShape.circle)))),
                   ]))),
 
-              // Taken with a meal
+              // Daily dose · times taken per day
+              if (daily) ...[
+                const SizedBox(height: 12),
+                _TimesPerDayRow(
+                  value: timesPerDay,
+                  onChanged: (v) => setSheet(() => timesPerDay = v)),
+              ],
+
+              // Taken with a meal / water
               const SizedBox(height: 14),
               Text('TAKEN WITH',
                 style: BMHText.monoSm.copyWith(
@@ -228,7 +261,38 @@ class _SupplementsScreenState extends State<SupplementsScreen> {
                         style: BMHText.monoSm.copyWith(
                           fontSize: 9.5,
                           color: withMeal == m
-                            ? _accent : BMHColors.inkDim)))),
+                            ? _accent : BMHColors.ink2)))),
+                // Water — a separate, additive toggle (add / remove).
+                GestureDetector(
+                  onTap: () => setSheet(() => withWater = !withWater),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: withWater
+                        ? BMHColors.sOxygen.withOpacity(0.16)
+                        : BMHColors.bg3,
+                      borderRadius:
+                        BorderRadius.circular(BMHRadius.full),
+                      border: Border.all(
+                        color: withWater
+                          ? BMHColors.sOxygen.withOpacity(0.5)
+                          : BMHColors.line)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(
+                        withWater
+                          ? Icons.water_drop_rounded
+                          : Icons.add_rounded,
+                        size: 12,
+                        color: withWater
+                          ? BMHColors.sOxygen : BMHColors.ink2),
+                      const SizedBox(width: 4),
+                      Text('Water',
+                        style: BMHText.monoSm.copyWith(
+                          fontSize: 9.5,
+                          color: withWater
+                            ? BMHColors.sOxygen : BMHColors.ink2)),
+                    ]))),
               ]),
 
               const SizedBox(height: 18),
@@ -322,7 +386,9 @@ class _SupplementsScreenState extends State<SupplementsScreen> {
                     nutrients: nutrients,
                     active: existing?.active ?? true,
                     daily: daily,
-                    withMeal: withMeal);
+                    withMeal: withMeal,
+                    timesPerDay: daily ? timesPerDay : 1,
+                    withWater: withWater);
                   existing == null
                     ? await _svc.add(s)
                     : await _svc.update(s);
@@ -617,12 +683,15 @@ class _SuppRow extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               supp.summary +
+                (supp.daily && supp.timesPerDay > 1
+                  ? ' · ${supp.timesPerDay}× a day' : '') +
                 (supp.withMeal != null
-                  ? ' · with ${supp.withMeal!.toLowerCase()}' : ''),
+                  ? ' · with ${supp.withMeal!.toLowerCase()}' : '') +
+                (supp.withWater ? ' · with water' : ''),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: BMHText.monoSm.copyWith(
-                fontSize: 9, color: BMHColors.inkDim, height: 1.35)),
+                fontSize: 9, color: BMHColors.ink2, height: 1.35)),
           ])),
         GestureDetector(
           onTap: onEdit,
@@ -638,4 +707,111 @@ class _SuppRow extends StatelessWidget {
               color: BMHColors.danger, size: 15))),
       ]));
   }
+}
+
+// ─────────────────────────────────────────────────────────
+//  DROPDOWN — pick a common supplement, or "Custom…" to type
+//  your own. Replaces the old row of chips so the choice reads
+//  as one clear control.
+// ─────────────────────────────────────────────────────────
+class _SupplementDropdown extends StatelessWidget {
+  final String? value;                       // null → Custom
+  final ValueChanged<String?> onChanged;
+  const _SupplementDropdown({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      decoration: BoxDecoration(
+        color: BMHColors.bg3,
+        borderRadius: BorderRadius.circular(BMHRadius.md),
+        border: Border.all(color: BMHColors.line)),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          isExpanded: true,
+          value: value,
+          dropdownColor: BMHColors.bg3,
+          borderRadius: BorderRadius.circular(BMHRadius.md),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+            color: BMHColors.ink2),
+          hint: Text('Custom — type your own',
+            style: BMHText.bodyMd.copyWith(color: BMHColors.ink2)),
+          style: BMHText.bodyMd.copyWith(color: BMHColors.ink),
+          items: [
+            DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Custom — type your own',
+                style: BMHText.bodyMd.copyWith(color: BMHColors.ink2))),
+            for (final p in SupplementPreset.all)
+              DropdownMenuItem<String?>(
+                value: p.name,
+                child: Text(p.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: BMHText.bodyMd.copyWith(color: BMHColors.ink))),
+          ],
+          onChanged: onChanged)));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  TIMES PER DAY — how many times the daily dose is taken.
+//  Shown only when "Take daily" is on, since a one-off does not
+//  have a per-day rhythm.
+// ─────────────────────────────────────────────────────────
+class _TimesPerDayRow extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+  const _TimesPerDayRow({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      decoration: BoxDecoration(
+        color: BMHColors.bg3,
+        borderRadius: BorderRadius.circular(BMHRadius.md),
+        border: Border.all(color: BMHColors.line)),
+      child: Row(children: [
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Daily dose',
+              style: BMHText.labelMd.copyWith(color: BMHColors.ink)),
+            const SizedBox(height: 3),
+            Text(value == 1
+                ? 'Taken once a day'
+                : 'Taken $value times a day',
+              style: BMHText.bodySm.copyWith(
+                fontSize: 10, color: BMHColors.ink2, height: 1.35)),
+          ])),
+        _stepBtn(Icons.remove_rounded,
+          value > 1 ? () => onChanged(value - 1) : null),
+        SizedBox(width: 30, child: Text('$value',
+          textAlign: TextAlign.center,
+          style: BMHText.heading3.copyWith(
+            fontSize: 18, color: BMHColors.ink))),
+        _stepBtn(Icons.add_rounded,
+          value < 6 ? () => onChanged(value + 1) : null),
+      ]));
+  }
+
+  Widget _stepBtn(IconData ic, VoidCallback? onTap) => GestureDetector(
+    onTap: onTap,
+    behavior: HitTestBehavior.opaque,
+    child: Container(
+      width: 30, height: 30,
+      decoration: BoxDecoration(
+        color: onTap == null
+          ? BMHColors.bg4.withOpacity(0.4)
+          : _accent.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(BMHRadius.sm),
+        border: Border.all(
+          color: onTap == null
+            ? BMHColors.line : _accent.withOpacity(0.4))),
+      child: Icon(ic, size: 16,
+        color: onTap == null ? BMHColors.inkMute : _accent)));
 }

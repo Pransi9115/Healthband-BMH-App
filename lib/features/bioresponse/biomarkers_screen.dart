@@ -4,7 +4,8 @@
 //  Two tabs:
 //    Nutrients    · one card per nutrient — intake on top, blood
 //                   underneath, so both sides read in a single glance
-//    Blood report · the panel BMH ran, with true counts
+//    Blood report · the panel BMH ran, in the same format the
+//                   printed report uses
 //
 //  Every tracked nutrient appears in the first tab. The blood half
 //  only shows for nutrients the panel actually measured; the rest
@@ -13,6 +14,10 @@
 //  The per day / per week range applies to intake only. A blood
 //  result is one lab measurement on one date, and the screen says
 //  so rather than implying it moves.
+//
+//  Shared formatting — markerColor, fmtNum, fmtDate and the report
+//  sections — lives in blood_report_format.dart so this screen and
+//  Biomedical Monitoring cannot drift apart.
 // ─────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
@@ -24,30 +29,13 @@ import '../../core/bioresponse/medication_service.dart';
 import '../../core/bioresponse/nutritional_score_service.dart';
 import '../../core/bioresponse/supplement_service.dart';
 import '../../core/diet/diet_service.dart';
+import 'blood_report_format.dart';
 import 'blood_report_screen.dart';
+
+export 'blood_report_format.dart' show markerColor, fmtNum, fmtDate;
 
 const _foodColor = BMHColors.sGut;
 const _suppColor = BMHColors.sMetabolic;
-
-Color markerColor(MarkerStatus s, bool highIsGood) => switch (s) {
-      MarkerStatus.low => BMHColors.warn,
-      MarkerStatus.high => highIsGood ? BMHColors.success : BMHColors.danger,
-      MarkerStatus.borderline => BMHColors.sMetabolic,
-      MarkerStatus.inRange => BMHColors.success,
-    };
-
-String fmtNum(double v) {
-  if (v >= 1000) return v.round().toString();
-  if (v == v.roundToDouble()) return v.round().toString();
-  if (v.abs() < 1) return v.toStringAsFixed(2);
-  return v.toStringAsFixed(1);
-}
-
-String fmtDate(DateTime d) {
-  const m = ['Jan','Feb','Mar','Apr','May','Jun',
-             'Jul','Aug','Sep','Oct','Nov','Dec'];
-  return '${d.day} ${m[d.month - 1]} ${d.year}';
-}
 
 class BiomarkersScreen extends StatefulWidget {
   final ScoreRange initialRange;
@@ -155,7 +143,7 @@ class _BiomarkersScreenState extends State<BiomarkersScreen> {
       child: Text(label,
         textAlign: TextAlign.center,
         style: BMHText.labelMd.copyWith(
-          color: _tab == i ? BMHColors.bg0 : BMHColors.inkDim,
+          color: _tab == i ? BMHColors.bg0 : BMHColors.ink2,
           fontWeight: _tab == i ? FontWeight.w700 : FontWeight.w500)))));
 
   // ═══════════════ TAB 1 · NUTRIENTS ════════════════════
@@ -186,7 +174,7 @@ class _BiomarkersScreenState extends State<BiomarkersScreen> {
                 child: Text(r.label,
                   textAlign: TextAlign.center,
                   style: BMHText.labelMd.copyWith(
-                    color: r == _range ? BMHColors.bg0 : BMHColors.inkDim,
+                    color: r == _range ? BMHColors.bg0 : BMHColors.ink2,
                     fontWeight: r == _range
                       ? FontWeight.w700 : FontWeight.w500))))),
         ])),
@@ -196,19 +184,12 @@ class _BiomarkersScreenState extends State<BiomarkersScreen> {
           ? 'Nothing logged in this range yet. Log meals and supplements '
             'in BioMedical Diet to fill the intake side.'
           : _range == ScoreRange.day
-            ? 'Intake is from the meals and supplements you logged today. '
-              'Blood is from your test on '
-              '${report == null ? "—" : fmtDate(report.testDate)} and does '
-              'not change with the range.'
+            ? 'Intake is from the meals and supplements you logged today.'
             : 'Intake is a daily average across $logged of the last 7 days '
-              'logged. Blood is from your test on '
-              '${report == null ? "—" : fmtDate(report.testDate)} and does '
-              'not change with the range.',
+              'logged.',
         style: BMHText.bodySm.copyWith(
-          fontSize: 10.5, color: BMHColors.inkMute, height: 1.45)),
+          fontSize: 11, color: BMHColors.ink, height: 1.45)),
       const SizedBox(height: 14),
-
-      if (_blood.isSample) _sampleBanner(),
 
       for (final r in results) ...[
         _NutrientCard(result: r),
@@ -218,6 +199,9 @@ class _BiomarkersScreenState extends State<BiomarkersScreen> {
   }
 
   // ═══════════════ TAB 2 · BLOOD REPORT ═════════════════
+  //  The same report the Blood Analysis screen shows, in the same
+  //  format as the printed document: who ran it, the counts, the
+  //  threads, the flagged markers, then what to do next.
   List<Widget> _bloodTab() {
     final report = _blood.report;
     if (report == null) {
@@ -231,187 +215,74 @@ class _BiomarkersScreenState extends State<BiomarkersScreen> {
             border: Border.all(color: BMHColors.line)),
           child: Column(children: [
             const Icon(Icons.bloodtype_outlined,
-              color: BMHColors.inkMute, size: 32),
+              color: BMHColors.ink2, size: 32),
             const SizedBox(height: 12),
             Text('No blood report yet',
-              style: BMHText.labelLg.copyWith(color: BMHColors.ink2)),
+              style: BMHText.labelLg.copyWith(color: BMHColors.ink)),
             const SizedBox(height: 6),
             Text('Your BMH blood panel appears here once your clinic '
                  'uploads it.',
               textAlign: TextAlign.center,
               style: BMHText.bodySm.copyWith(
-                fontSize: 11, color: BMHColors.inkMute, height: 1.5)),
+                fontSize: 11, color: BMHColors.ink2, height: 1.5)),
           ])),
       ];
     }
 
-    return [
-      if (_blood.isSample) _sampleBanner(),
+    final flagged = report.flagged;
 
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: BMHColors.surface,
-          borderRadius: BorderRadius.circular(BMHRadius.xl),
-          border: Border.all(color: BMHColors.line)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(report.testName,
-              style: BMHText.labelLg.copyWith(color: BMHColors.ink)),
-            const SizedBox(height: 3),
-            Text('Tested ${fmtDate(report.testDate)} · BioHealthcare Hub',
-              style: BMHText.monoSm.copyWith(
-                fontSize: 9.5, color: BMHColors.inkDim)),
-            const SizedBox(height: 16),
-            Row(children: [
-              _stat('${report.concernCount}', 'Outside\nrange',
-                BMHColors.danger),
-              _stat('${report.borderlineCount}', 'Border-\nline',
-                BMHColors.sMetabolic),
-              _stat('${report.inRangeCount}', 'In\nrange',
-                BMHColors.success),
-              _stat('${report.totalCount}', 'Total\nmarkers',
-                BMHColors.cyan),
-            ]),
-            if (report.priorityCount > 0 || report.favourableCount > 0) ...[
-              const SizedBox(height: 14),
-              const Divider(color: BMHColors.line, height: 1),
-              const SizedBox(height: 12),
-              if (report.priorityCount > 0)
-                _summaryLine(Icons.priority_high_rounded, BMHColors.danger,
-                  '${report.priorityCount} of the ${report.concernCount} '
-                  'were flagged by your clinician as needing attention '
-                  'first'),
-              if (report.favourableCount > 0) ...[
-                const SizedBox(height: 8),
-                _summaryLine(Icons.check_circle_outline_rounded,
-                  BMHColors.success,
-                  '${report.favourableCount} marker above its range is a '
-                  'good result, not a concern'),
-              ],
-            ],
-          ])),
+    return [
+      ReportMasthead(report: report),
+      const SizedBox(height: 16),
+      ReportCounts(report: report),
 
       const SizedBox(height: 18),
-      GestureDetector(
+      BloodReportOutlineButton(
+        label: 'VIEW ALL ${report.totalCount} MARKERS',
         onTap: () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => BloodReportScreen(report: report))),
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(BMHRadius.full),
-            border: Border.all(color: BMHColors.cyan.withOpacity(0.5))),
-          child: Text('View all ${report.totalCount} markers',
-            textAlign: TextAlign.center,
-            style: BMHText.labelLg.copyWith(
-              color: BMHColors.cyan, fontWeight: FontWeight.w600)))),
+          builder: (_) => BloodReportScreen(report: report)))),
 
-      const SizedBox(height: 24),
-      BMHSectionTitle('Outside range'),
-      const SizedBox(height: 12),
-      if (report.concerns.isEmpty)
-        _footNote('Every marker in this panel sits inside its reference '
-                  'range.')
-      else
-        for (final m in report.concerns) ...[
-          _MarkerCard(marker: m),
-          const SizedBox(height: 11),
-        ],
-
-      if (report.recommendations.isNotEmpty) ...[
-        const SizedBox(height: 22),
-        BMHSectionTitle('Clinical recommendations'),
+      if (report.threads.isNotEmpty) ...[
+        const SizedBox(height: 24),
+        BMHSectionTitle('Read this first'),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: BMHColors.surface,
-            borderRadius: BorderRadius.circular(BMHRadius.lg),
-            border: Border.all(color: BMHColors.line)),
-          child: Column(children: [
-            for (var i = 0; i < report.recommendations.length; i++) ...[
-              if (i > 0) const Divider(color: BMHColors.line, height: 20),
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(
-                  width: 20, height: 20,
-                  margin: const EdgeInsets.only(top: 1),
-                  decoration: BoxDecoration(
-                    color: BMHColors.cyan.withOpacity(0.12),
-                    shape: BoxShape.circle),
-                  child: Center(child: Text('${i + 1}',
-                    style: BMHText.monoSm.copyWith(
-                      fontSize: 9, color: BMHColors.cyan,
-                      fontWeight: FontWeight.w700)))),
-                const SizedBox(width: 11),
-                Expanded(child: Text(report.recommendations[i],
-                  style: BMHText.bodySm.copyWith(
-                    fontSize: 11, color: BMHColors.ink2, height: 1.5))),
-              ]),
-            ],
-          ])),
+        ReportThreads(report: report),
+      ],
+
+      const SizedBox(height: 22),
+      BMHSectionTitle('What the report flagged'),
+      const SizedBox(height: 10),
+      Text(
+        flagged.isEmpty
+          ? 'Every marker in this panel sits inside its reference range.'
+          : '${report.outsideRangeCount} of ${report.totalCount} markers '
+            'fell outside the laboratory reference range. Tap any one to '
+            'read what it means and what you can do.',
+        style: BMHText.bodySm.copyWith(
+          fontSize: 11, color: BMHColors.ink, height: 1.5)),
+      const SizedBox(height: 12),
+      const ReportLegend(),
+      const SizedBox(height: 14),
+      for (final m in flagged) ...[
+        ReportMarkerRow(marker: m),
+        const SizedBox(height: 9),
+      ],
+
+      if (report.steps.isNotEmpty) ...[
+        const SizedBox(height: 22),
+        BMHSectionTitle('What to do next'),
+        const SizedBox(height: 6),
+        Text('In the order that makes the most difference.',
+          style: BMHText.bodySm.copyWith(
+            fontSize: 11, color: BMHColors.ink)),
+        const SizedBox(height: 12),
+        ReportSteps(report: report),
       ],
 
       const SizedBox(height: 18),
-      _footNote(
-        'Prepared from a blood sample without access to your full medical '
-        'records. Not for diagnosing or treating any condition — always '
-        'speak to a medical professional before acting on these results.'),
+      ReportDisclaimer(report: report),
     ];
   }
-
-  Widget _summaryLine(IconData ic, Color c, String text) =>
-      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(ic, color: c, size: 14),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text,
-          style: BMHText.bodySm.copyWith(
-            fontSize: 10.5, color: BMHColors.ink2, height: 1.4))),
-      ]);
-
-  Widget _stat(String v, String l, Color c) => Expanded(child: Column(
-    children: [
-      Text(v, style: BMHText.heading2.copyWith(color: c)),
-      const SizedBox(height: 3),
-      Text(l,
-        textAlign: TextAlign.center,
-        style: BMHText.monoSm.copyWith(
-          fontSize: 8, height: 1.3, color: BMHColors.inkDim)),
-    ]));
-
-  Widget _sampleBanner() => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(
-      color: BMHColors.sMetabolic.withOpacity(0.10),
-      borderRadius: BorderRadius.circular(BMHRadius.md),
-      border: Border.all(color: BMHColors.sMetabolic.withOpacity(0.35))),
-    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Icon(Icons.science_outlined,
-        color: BMHColors.sMetabolic, size: 15),
-      const SizedBox(width: 10),
-      Expanded(child: Text(
-        'Example panel. Your own results replace this as soon as your '
-        'clinic uploads your blood report.',
-        style: BMHText.bodySm.copyWith(
-          fontSize: 10.5, color: BMHColors.ink2, height: 1.45))),
-    ]));
-
-  Widget _footNote(String s) => Container(
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(
-      color: BMHColors.bg2,
-      borderRadius: BorderRadius.circular(BMHRadius.md),
-      border: Border.all(color: BMHColors.line)),
-    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Icon(Icons.info_outline_rounded,
-        color: BMHColors.inkDim, size: 14),
-      const SizedBox(width: 10),
-      Expanded(child: Text(s,
-        style: BMHText.bodySm.copyWith(
-          fontSize: 10.5, color: BMHColors.inkMute, height: 1.45))),
-    ]));
 }
 
 // ─────────────────────────────────────────────────────────
@@ -498,7 +369,7 @@ class _NutrientCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(_category,
                   style: BMHText.monoSm.copyWith(
-                    fontSize: 9, color: BMHColors.inkMute)),
+                    fontSize: 9.5, color: BMHColors.ink2)),
               ])),
             Container(
               padding: const EdgeInsets.symmetric(
@@ -527,7 +398,7 @@ class _NutrientCard extends StatelessWidget {
               Text('INTAKE',
                 style: BMHText.monoSm.copyWith(
                   fontSize: 8.5, letterSpacing: 1.3,
-                  color: BMHColors.inkDim, fontWeight: FontWeight.w600)),
+                  color: BMHColors.ink, fontWeight: FontWeight.w600)),
               const Spacer(),
               Text(
                 result.hasIntake
@@ -539,7 +410,7 @@ class _NutrientCard extends StatelessWidget {
               const SizedBox(width: 5),
               Text('vs ${fmtNum(result.intakeTarget)}',
                 style: BMHText.monoSm.copyWith(
-                  fontSize: 9.5, color: BMHColors.inkMute)),
+                  fontSize: 9.5, color: BMHColors.ink2)),
             ]),
           const SizedBox(height: 8),
           _IntakeBar(
@@ -553,19 +424,19 @@ class _NutrientCard extends StatelessWidget {
             const SizedBox(width: 5),
             Text('food ${fmtNum(result.intakeFromFood)}',
               style: BMHText.monoSm.copyWith(
-                fontSize: 9, color: BMHColors.inkMute)),
+                fontSize: 9.5, color: BMHColors.ink)),
             if (result.intakeFromSupplements > 0) ...[
               const SizedBox(width: 10),
               _swatch(_suppColor),
               const SizedBox(width: 5),
               Text('supplement ${fmtNum(result.intakeFromSupplements)}',
                 style: BMHText.monoSm.copyWith(
-                  fontSize: 9, color: BMHColors.inkMute)),
+                  fontSize: 9.5, color: BMHColors.ink)),
             ] else ...[
               const SizedBox(width: 8),
               Text('· no supplement',
                 style: BMHText.monoSm.copyWith(
-                  fontSize: 9, color: BMHColors.inkFaint)),
+                  fontSize: 9.5, color: BMHColors.ink2)),
             ],
             const Spacer(),
             if (result.hasIntake && pct > _barCeiling)
@@ -579,7 +450,7 @@ class _NutrientCard extends StatelessWidget {
           if (b != null) ...[
             const SizedBox(height: 11),
             const Center(child: Icon(Icons.south_rounded,
-              color: BMHColors.inkFaint, size: 13)),
+              color: BMHColors.ink2, size: 14)),
             const SizedBox(height: 9),
             Row(crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
@@ -587,7 +458,7 @@ class _NutrientCard extends StatelessWidget {
                 Text('BLOOD',
                   style: BMHText.monoSm.copyWith(
                     fontSize: 8.5, letterSpacing: 1.3,
-                    color: BMHColors.inkDim, fontWeight: FontWeight.w600)),
+                    color: BMHColors.ink, fontWeight: FontWeight.w600)),
                 const Spacer(),
                 Flexible(child: Text('${fmtNum(b.value)} ${b.unit}',
                   maxLines: 1,
@@ -604,7 +475,7 @@ class _NutrientCard extends StatelessWidget {
               '${b.name} · range ${fmtNum(b.refLow)} to '
               '${fmtNum(b.refHigh)} ${b.unit}',
               style: BMHText.monoSm.copyWith(
-                fontSize: 9, color: BMHColors.inkMute)),
+                fontSize: 9.5, color: BMHColors.ink2)),
           ] else ...[
             const SizedBox(height: 11),
             Container(
@@ -617,7 +488,7 @@ class _NutrientCard extends StatelessWidget {
               child: Text(
                 'Not measured in your latest blood panel — intake only.',
                 style: BMHText.monoSm.copyWith(
-                  fontSize: 9, color: BMHColors.inkMute))),
+                  fontSize: 9.5, color: BMHColors.ink2))),
           ],
 
           // ── VERDICT ──
@@ -635,7 +506,7 @@ class _NutrientCard extends StatelessWidget {
                   const SizedBox(width: 9),
                   Expanded(child: Text(result.message,
                     style: BMHText.bodySm.copyWith(
-                      fontSize: 10.5, color: BMHColors.ink2,
+                      fontSize: 11, color: BMHColors.ink,
                       height: 1.5))),
                 ])),
           ],
@@ -650,7 +521,7 @@ class _NutrientCard extends StatelessWidget {
               if (result.medications.isNotEmpty) 'medication records',
             ].join(', ')}.',
             style: BMHText.monoSm.copyWith(
-              fontSize: 8.5, color: BMHColors.inkFaint, height: 1.4)),
+              fontSize: 9, color: BMHColors.ink2, height: 1.4)),
         ]));
   }
 
@@ -757,123 +628,6 @@ class _BloodBar extends StatelessWidget {
             width: 3, height: 14,
             decoration: BoxDecoration(
               color: c, borderRadius: BorderRadius.circular(2)))),
-      ]));
-    });
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-class _MarkerCard extends StatelessWidget {
-  final BloodMarker marker;
-  const _MarkerCard({required this.marker});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = markerColor(marker.status, marker.highIsGood);
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: BMHColors.surface,
-        borderRadius: BorderRadius.circular(BMHRadius.lg),
-        border: Border.all(color: c.withOpacity(0.28))),
-      child: Column(children: [
-        Row(children: [
-          Expanded(child: Row(children: [
-            Flexible(child: Text(marker.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: BMHText.labelMd.copyWith(color: BMHColors.ink))),
-            if (marker.priority) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: BMHColors.danger.withOpacity(0.16),
-                  borderRadius: BorderRadius.circular(BMHRadius.full)),
-                child: Text('PRIORITY',
-                  style: BMHText.monoSm.copyWith(
-                    fontSize: 7, letterSpacing: 0.5,
-                    color: BMHColors.danger,
-                    fontWeight: FontWeight.w700))),
-            ],
-          ])),
-          const SizedBox(width: 8),
-          Text('${fmtNum(marker.value)} ${marker.unit}',
-            style: BMHText.monoMd.copyWith(
-              fontSize: 12, color: c, fontWeight: FontWeight.w700)),
-        ]),
-        const SizedBox(height: 6),
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: c.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(BMHRadius.full)),
-            child: Text(
-              marker.highIsGood && marker.status == MarkerStatus.high
-                ? 'HIGH — PROTECTIVE'
-                : marker.status.label,
-              style: BMHText.monoSm.copyWith(
-                fontSize: 8, color: c, fontWeight: FontWeight.w700))),
-          const Spacer(),
-          Text('ref ${fmtNum(marker.refLow)}–${fmtNum(marker.refHigh)} '
-               '${marker.unit}',
-            style: BMHText.monoSm.copyWith(
-              fontSize: 8.5, color: BMHColors.inkMute)),
-        ]),
-        const SizedBox(height: 11),
-        RangeBar(marker: marker, color: c),
-        if (marker.note.isNotEmpty) ...[
-          const SizedBox(height: 11),
-          Text(marker.note,
-            style: BMHText.bodySm.copyWith(
-              fontSize: 10.5, color: BMHColors.inkDim, height: 1.5)),
-        ],
-      ]));
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-//  Shared by the full-report screen
-// ─────────────────────────────────────────────────────────
-class RangeBar extends StatelessWidget {
-  final BloodMarker marker;
-  final Color color;
-  const RangeBar({super.key, required this.marker, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (ctx, box) {
-      final w = box.maxWidth;
-      final zs = marker.zoneStart, ze = marker.zoneEnd;
-      final pos = marker.barPosition;
-      return SizedBox(height: 26, child: Stack(children: [
-        Positioned(
-          left: 0, right: 0, top: 10,
-          child: Container(
-            height: 7,
-            decoration: BoxDecoration(
-              color: BMHColors.danger.withOpacity(0.16),
-              borderRadius: BorderRadius.circular(BMHRadius.full)))),
-        Positioned(
-          left: zs * w, width: ((ze - zs) * w).clamp(2.0, w), top: 10,
-          child: Container(
-            height: 7,
-            decoration: BoxDecoration(
-              color: BMHColors.success.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(BMHRadius.full)))),
-        Positioned(
-          left: (pos * w - 5).clamp(0.0, w - 10), top: 2,
-          child: Column(children: [
-            Container(
-              width: 10, height: 7,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(2))),
-            Container(width: 2, height: 14, color: color),
-          ])),
       ]));
     });
   }

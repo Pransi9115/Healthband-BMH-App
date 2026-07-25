@@ -1,7 +1,7 @@
 ﻿name: bmh_app
 description: BioMedical Healthcare — BMH Mobile App
 publish_to: 'none'
-version: 1.0.0+87
+version: 1.0.0+88
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -30,6 +30,7 @@ dependencies:
   health: ^11.0.0
   flutter_local_notifications: ^17.2.2
   flutter_secure_storage: ^9.2.2
+   image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
