@@ -82,6 +82,13 @@ class UsdaFoodService {
     1095: 'Zinc',        // mg
     1092: 'Potassium',   // mg
     1087: 'Calcium',     // mg
+    1093: 'Sodium',      // mg
+    1091: 'Phosphorus',  // mg
+    1100: 'Iodine',      // mcg
+    1180: 'Choline',     // mg (total)
+    1079: 'Fibre',       // g  (fiber, total dietary)
+    1258: 'Saturated fat', // g (fatty acids, total saturated)
+    1235: 'Added sugar', // g  (sugars, added)
   };
 
   // Omega-3 = ALA (18:3 n-3) + EPA (20:5 n-3) + DHA (22:6 n-3), grams.

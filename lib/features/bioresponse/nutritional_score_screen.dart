@@ -1,17 +1,29 @@
 // ─────────────────────────────────────────────────────────
 //  BIORESPONSE — NUTRITIONAL SCORE
-//  All 11 goals scored from the patient's logged meals, with a
-//  per day / per week range the patient controls. Tapping a goal
-//  opens the nutrient-by-nutrient breakdown behind its score.
+//
+//  The provider dashboard view, brought into the app unchanged:
+//    · a strip of the day being graded
+//    · 6 category tabs
+//    · the profiles inside the selected tab, as chips
+//    · the grade for the selected profile, with every criterion
+//      shown against its own target
+//    · provider notes
+//
+//  Grades come from NutritionalScoreService, which is a direct port
+//  of the dashboard engine, so a number here and a number there can
+//  never disagree.
 // ─────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../core/bioresponse/nutritional_score_service.dart';
 import '../../core/diet/diet_service.dart';
 
 class NutritionalScoreScreen extends StatefulWidget {
+  /// Kept so existing callers compile; the dashboard grades one day.
   final ScoreRange initialRange;
   const NutritionalScoreScreen({
     super.key,
@@ -26,41 +38,72 @@ class NutritionalScoreScreen extends StatefulWidget {
 class _NutritionalScoreScreenState extends State<NutritionalScoreScreen> {
   final _svc = NutritionalScoreService.instance;
   final _diet = DietService.instance;
-  late ScoreRange _range;
+
+  String _categoryKey = kCategories.first.key;
+  late String _profileKey = _svc.profilesIn(_categoryKey).first.key;
+
+  final _notes = TextEditingController();
+  String _notesStatus = '';
+  bool _ready = false;
 
   @override
   void initState() {
     super.initState();
-    _range = widget.initialRange;
-    _ensureWeek();
+    _boot();
   }
 
-  /// Weekly scoring reads six earlier days, which may not be in
-  /// memory yet — load them before scoring.
-  Future<void> _ensureWeek() async {
-    for (final d in _svc.daysIn(ScoreRange.week, DateTime.now())) {
-      await _diet.ensureDay(d);
-    }
-    if (mounted) setState(() {});
+  Future<void> _boot() async {
+    final today = DateTime.now();
+    await _diet.ensureDay(today);
+    final p = await SharedPreferences.getInstance();
+    _svc.bodyWeightKg =
+        p.getDouble('profile_weight') ?? kReferenceWeightKg;
+    _notes.text = p.getString(_notesKey(today)) ?? '';
+    if (mounted) setState(() => _ready = true);
   }
 
-  static Color colorFor(double s, bool hasData) {
-    if (!hasData) return BMHColors.inkMute;
-    if (s >= 80) return BMHColors.success;
-    if (s >= 60) return BMHColors.sGut;
-    if (s >= 40) return BMHColors.warn;
-    return BMHColors.danger;
+  String _notesKey(DateTime d) =>
+      'bioresponse_notes_${d.year}-${d.month}-${d.day}';
+
+  Future<void> _saveNote() async {
+    final now = DateTime.now();
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_notesKey(now), _notes.text);
+    final stamp = '${now.day.toString().padLeft(2, '0')} '
+        '${_month(now.month)} ${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}';
+    if (mounted) setState(() => _notesStatus = 'Saved $stamp');
+  }
+
+  static String _month(int m) => const [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ][m - 1];
+
+  void _selectCategory(String key) {
+    setState(() {
+      _categoryKey = key;
+      _profileKey = _svc.profilesIn(key).first.key;
+    });
+  }
+
+  @override
+  void dispose() {
+    _notes.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final scores = _svc.scoreAll(_range);
-    final logged = _svc.daysLogged(_range);
-    final hasData = logged > 0;
+    final today = DateTime.now();
+    final totals = _svc.totalsFor(today);
+    final profile = _svc.profileByKey(_profileKey)!;
+    final grade = _svc.gradeFor(profile, totals);
 
     return Scaffold(
       backgroundColor: BMHColors.bg0,
       body: SafeArea(child: Column(children: [
+        // ── HEADER ────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: BMHSpacing.s5, vertical: 8),
@@ -73,75 +116,88 @@ class _NutritionalScoreScreenState extends State<NutritionalScoreScreen> {
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const BMHEyebrow('BIORESPONSE'),
-                Text('Nutritional score', style: BMHText.heading1),
+                const BMHEyebrow('BIOHEALTHCARE / BIOMEDICAL DIET'),
+                Text('BioResponse', style: BMHText.heading1),
               ])),
           ])),
 
+        if (!_ready)
+          const Expanded(child: Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2, color: BMHColors.cyan)))
+        else
         Expanded(child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: BMHSpacing.s5),
           children: [
-            const SizedBox(height: 6),
-
-            // Range control
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: BMHColors.bg2,
-                borderRadius: BorderRadius.circular(BMHRadius.full),
-                border: Border.all(color: BMHColors.line)),
-              child: Row(children: [
-                for (final r in ScoreRange.values)
-                  Expanded(child: GestureDetector(
-                    onTap: () => setState(() => _range = r),
-                    behavior: HitTestBehavior.opaque,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      padding: const EdgeInsets.symmetric(vertical: 9),
-                      decoration: BoxDecoration(
-                        color: r == _range
-                          ? BMHColors.cyan : Colors.transparent,
-                        borderRadius:
-                          BorderRadius.circular(BMHRadius.full)),
-                      child: Text(r.label,
-                        textAlign: TextAlign.center,
-                        style: BMHText.labelMd.copyWith(
-                          color: r == _range
-                            ? BMHColors.bg0 : BMHColors.inkDim,
-                          fontWeight: r == _range
-                            ? FontWeight.w700 : FontWeight.w500))))),
-              ])),
-            const SizedBox(height: 10),
-
-            Text(
-              hasData
-                ? _range == ScoreRange.day
-                  ? 'Scored from the meals you logged today.'
-                  : 'Scored from $logged of the last 7 days that have '
-                    'logged meals. Days with no food are left out rather '
-                    'than counted as zero.'
-                : 'No meals logged in this range yet.',
-              style: BMHText.bodySm.copyWith(
-                fontSize: 11, color: BMHColors.inkMute, height: 1.45)),
-
+            Text('How your body responds to what you eat.',
+              style: BMHText.heading3.copyWith(color: BMHColors.cyan)),
             const SizedBox(height: 18),
 
-            if (!hasData)
-              _EmptyState(range: _range)
-            else ...[
-              BMHSectionTitle('Goals · highest first'),
-              const SizedBox(height: 12),
-              for (final s in scores) ...[
-                _GoalCard(
-                  result: s,
-                  range: _range,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => _GoalDetailScreen(
-                      result: s, range: _range))),
-                ),
-                const SizedBox(height: 10),
-              ],
-            ],
+            Text('Your BioResponse nutritional score',
+              style: BMHText.heading2),
+            const SizedBox(height: 6),
+            Text(
+              'Pick a goal or a health condition, and today’s food is '
+              'graded on how your body would respond to it. The same day '
+              'scores differently for each, since a plate that suits one '
+              'goal can work against another.',
+              style: BMHText.bodySm.copyWith(
+                fontSize: 11.5, color: BMHColors.inkDim, height: 1.5)),
+            const SizedBox(height: 16),
+
+            // ── DAY STRIP ─────────────────────────────────
+            _DayStrip(totals: totals),
+            const SizedBox(height: 16),
+
+            // ── CATEGORY TABS ─────────────────────────────
+            SizedBox(height: 38, child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: kCategories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final c = kCategories[i];
+                final on = c.key == _categoryKey;
+                return _Tab(
+                  label: c.name,
+                  selected: on,
+                  onTap: () => _selectCategory(c.key));
+              })),
+            const SizedBox(height: 10),
+
+            // ── PROFILE CHIPS ─────────────────────────────
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final p in _svc.profilesIn(_categoryKey))
+                _Chip(
+                  label: p.name,
+                  selected: p.key == _profileKey,
+                  onTap: () => setState(() => _profileKey = p.key)),
+            ]),
+            const SizedBox(height: 18),
+
+            // ── RESULT ────────────────────────────────────
+            _ResultCard(profile: profile, grade: grade),
+            const SizedBox(height: 18),
+
+            // ── PROVIDER NOTES ────────────────────────────
+            _NotesCard(
+              controller: _notes,
+              status: _notesStatus,
+              onSave: _saveNote),
+            const SizedBox(height: 16),
+
+            Text(
+              'Grades are guidance toward the chosen goal, not a '
+              'judgement of the person or medical advice. Safety '
+              'ceilings such as potassium and phosphorus for renal care '
+              'come from clinician validated limits and cap the grade on '
+              'their own. A grade that is not suitable is flagged to the '
+              'assigned provider.',
+              style: BMHText.bodySm.copyWith(
+                fontSize: 10.5, color: BMHColors.inkMute, height: 1.55)),
+            const SizedBox(height: 10),
+            Text('BioHealthcare Group / BioResponse',
+              style: BMHText.monoSm.copyWith(
+                fontSize: 9.5, color: BMHColors.inkFaint)),
             const SizedBox(height: 40),
           ])),
       ])),
@@ -150,309 +206,450 @@ class _NutritionalScoreScreenState extends State<NutritionalScoreScreen> {
 }
 
 // ─────────────────────────────────────────────────────────
-class _EmptyState extends StatelessWidget {
-  final ScoreRange range;
-  const _EmptyState({required this.range});
+//  DAY STRIP — the day being graded
+// ─────────────────────────────────────────────────────────
+class _DayStrip extends StatelessWidget {
+  final DayTotals totals;
+  const _DayStrip({required this.totals});
+
+  static String _fmt(double v) {
+    final r = (v * 10).round() / 10;
+    return r == r.roundToDouble() ? r.toInt().toString() : r.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final who = totals.isReference
+        ? 'TODAY, MEMBER 4471, ${_fmt(totals.weightKg)} KG'
+        : 'TODAY, ${_fmt(totals.weightKg)} KG';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: BMHColors.line)),
+      child: Wrap(
+        spacing: 8, runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(who, style: BMHText.monoSm.copyWith(
+            fontSize: 9.5, letterSpacing: 0.6, color: BMHColors.inkMute)),
+          for (final k in Nutrients.summaryKeys)
+            _Stat(
+              label: Nutrients.of(k).label,
+              value: _fmt(totals[k]),
+              unit: Nutrients.of(k).unit),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: totals.isReference
+                ? BMHColors.bg4
+                : BMHColors.success.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(BMHRadius.sm)),
+            child: Text(totals.sourceLabel,
+              style: BMHText.monoSm.copyWith(
+                fontSize: 9.5,
+                color: totals.isReference
+                  ? BMHColors.inkDim : BMHColors.success))),
+        ]));
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final String label, value, unit;
+  const _Stat({required this.label, required this.value, required this.unit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: BMHColors.bg4,
+        borderRadius: BorderRadius.circular(BMHRadius.sm)),
+      child: RichText(text: TextSpan(children: [
+        TextSpan(text: '$label ',
+          style: BMHText.monoSm.copyWith(
+            fontSize: 10, color: BMHColors.inkDim)),
+        TextSpan(text: value,
+          style: BMHText.monoSm.copyWith(
+            fontSize: 10, color: BMHColors.ink,
+            fontWeight: FontWeight.w700)),
+        TextSpan(text: ' $unit',
+          style: BMHText.monoSm.copyWith(
+            fontSize: 10, color: BMHColors.inkDim)),
+      ])));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  TAB AND CHIP
+// ─────────────────────────────────────────────────────────
+class _Tab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _Tab({
+    required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? BMHColors.cyan : BMHColors.surface,
+          borderRadius: BorderRadius.circular(BMHRadius.md),
+          border: Border.all(
+            color: selected ? BMHColors.cyan : BMHColors.line)),
+        child: Text(label,
+          style: BMHText.labelMd.copyWith(
+            fontSize: 12.5,
+            color: selected ? BMHColors.bg0 : BMHColors.ink2,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500))));
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _Chip({
+    required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? BMHColors.sGut.withOpacity(0.18) : BMHColors.bg2,
+          borderRadius: BorderRadius.circular(BMHRadius.full),
+          border: Border.all(
+            color: selected ? BMHColors.sGut : BMHColors.line)),
+        child: Text(label,
+          style: BMHText.bodySm.copyWith(
+            fontSize: 12,
+            color: selected ? BMHColors.sGut : BMHColors.ink2,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500))));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  RESULT CARD
+// ─────────────────────────────────────────────────────────
+Color _bandColor(GradeBand b) => switch (b) {
+      GradeBand.good => BMHColors.success,
+      GradeBand.moderate => BMHColors.warn,
+      GradeBand.poor => BMHColors.danger,
+    };
+
+Color _barColor(int score) => score >= 75
+    ? BMHColors.success
+    : score >= 55 ? BMHColors.warn : BMHColors.danger;
+
+class _ResultCard extends StatelessWidget {
+  final GoalProfile profile;
+  final Grade grade;
+  const _ResultCard({required this.profile, required this.grade});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _bandColor(grade.band);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.xl),
+        border: Border.all(color: BMHColors.line)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── ring + verdict ────────────────────────────
+          Row(children: [
+            Container(
+              width: 76, height: 76,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: BMHColors.bg0,
+                border: Border.all(color: c, width: 3.5)),
+              child: Text(grade.score.toString(),
+                style: BMHText.monoLg.copyWith(
+                  fontSize: 26, color: c, fontWeight: FontWeight.w700))),
+            const SizedBox(width: 16),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(grade.verdict, style: BMHText.heading3),
+                const SizedBox(height: 3),
+                Text(grade.scoreLine,
+                  style: BMHText.monoSm.copyWith(
+                    fontSize: 10.5, color: BMHColors.inkDim)),
+              ])),
+          ]),
+          const SizedBox(height: 14),
+
+          Text(profile.note,
+            style: BMHText.bodySm.copyWith(
+              fontSize: 11.5, color: BMHColors.inkDim, height: 1.5)),
+
+          // ── safety banner ─────────────────────────────
+          if (grade.hasBreach) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: BMHColors.danger.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(BMHRadius.md),
+                border: Border.all(
+                  color: BMHColors.danger.withOpacity(0.4))),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                    color: BMHColors.danger, size: 17),
+                  const SizedBox(width: 9),
+                  Expanded(child: Text(
+                    'Safety limit reached: ${grade.breaches.join("; ")}. '
+                    'Flagged to the provider.',
+                    style: BMHText.bodySm.copyWith(
+                      fontSize: 11, color: BMHColors.danger, height: 1.45))),
+                ])),
+          ],
+
+          const SizedBox(height: 16),
+          Divider(color: BMHColors.line, height: 1),
+          const SizedBox(height: 14),
+
+          Text('HOW THE DAY SCORED ON EACH TARGET',
+            style: BMHText.monoSm.copyWith(
+              fontSize: 9.5, letterSpacing: 0.9, color: BMHColors.inkMute)),
+          const SizedBox(height: 12),
+
+          for (final r in grade.criteria) ...[
+            _CriterionRowView(row: r),
+            const SizedBox(height: 12),
+          ],
+
+          const SizedBox(height: 2),
+          // ── what helped / what held it back ───────────
+          LayoutBuilder(builder: (_, box) {
+            final wide = box.maxWidth > 420;
+            final helped = _DriverBox(
+              title: 'WHAT HELPED',
+              tint: BMHColors.success,
+              items: grade.helped,
+              empty: 'Nothing scored strongly today');
+            final held = _DriverBox(
+              title: 'WHAT HELD IT BACK',
+              tint: BMHColors.danger,
+              items: grade.heldBack,
+              empty: 'Nothing fell short');
+            return wide
+                ? Row(crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: helped),
+                      const SizedBox(width: 12),
+                      Expanded(child: held),
+                    ])
+                : Column(children: [
+                    helped, const SizedBox(height: 12), held,
+                  ]);
+          }),
+        ]));
+  }
+}
+
+// ── one criterion: label, value, bar, target ──────────────
+class _CriterionRowView extends StatelessWidget {
+  final CriterionRow row;
+  const _CriterionRowView({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Expanded(child: Text(row.label,
+            style: BMHText.labelMd.copyWith(
+              fontSize: 12.5, color: BMHColors.ink))),
+          Text(row.valueText,
+            style: BMHText.monoSm.copyWith(
+              fontSize: 12, color: BMHColors.ink,
+              fontWeight: FontWeight.w700)),
+          const SizedBox(width: 3),
+          Text(row.unit,
+            style: BMHText.monoSm.copyWith(
+              fontSize: 9.5, color: BMHColors.inkMute)),
+        ]),
+        const SizedBox(height: 7),
+        Row(children: [
+          Expanded(child: ClipRRect(
+            borderRadius: BorderRadius.circular(BMHRadius.full),
+            child: LinearProgressIndicator(
+              value: (row.score / 100).clamp(0.0, 1.0),
+              minHeight: 6,
+              backgroundColor: BMHColors.bg4,
+              valueColor:
+                AlwaysStoppedAnimation(_barColor(row.score))))),
+          const SizedBox(width: 10),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 130),
+            child: Text(row.target,
+              textAlign: TextAlign.right,
+              style: BMHText.monoSm.copyWith(
+                fontSize: 9.5, color: BMHColors.inkMute))),
+        ]),
+      ]);
+  }
+}
+
+// ── what helped / what held it back ───────────────────────
+class _DriverBox extends StatelessWidget {
+  final String title;
+  final Color tint;
+  final List<String> items;
+  final String empty;
+
+  const _DriverBox({
+    required this.title,
+    required this.tint,
+    required this.items,
+    required this.empty,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final list = items.isEmpty ? <String>[empty] : items;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: BMHColors.bg2,
+        borderRadius: BorderRadius.circular(BMHRadius.md),
+        border: Border.all(color: BMHColors.line)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+            style: BMHText.monoSm.copyWith(
+              fontSize: 9.5, letterSpacing: 0.8,
+              color: tint, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 9),
+          for (final x in list)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 5),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 5, height: 5,
+                    margin: const EdgeInsets.only(top: 6, right: 8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: items.isEmpty ? BMHColors.inkMute : tint)),
+                  Expanded(child: Text(x,
+                    style: BMHText.bodySm.copyWith(
+                      fontSize: 11.5,
+                      color: items.isEmpty
+                        ? BMHColors.inkMute : BMHColors.ink2))),
+                ])),
+        ]));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  PROVIDER NOTES
+// ─────────────────────────────────────────────────────────
+class _NotesCard extends StatelessWidget {
+  final TextEditingController controller;
+  final String status;
+  final VoidCallback onSave;
+
+  const _NotesCard({
+    required this.controller,
+    required this.status,
+    required this.onSave,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: BMHColors.surface,
         borderRadius: BorderRadius.circular(BMHRadius.lg),
         border: Border.all(color: BMHColors.line)),
-      child: Column(children: [
-        const Icon(Icons.restaurant_menu_outlined,
-          color: BMHColors.inkMute, size: 32),
-        const SizedBox(height: 12),
-        Text('Nothing to score yet',
-          style: BMHText.labelLg.copyWith(color: BMHColors.ink2)),
-        const SizedBox(height: 6),
-        Text(
-          range == ScoreRange.day
-            ? 'Log today’s meals in BioMedical Diet and all 11 goals '
-              'will be scored from what you actually ate.'
-            : 'Log meals across the week and this view will average '
-              'the days you recorded.',
-          textAlign: TextAlign.center,
-          style: BMHText.bodySm.copyWith(
-            fontSize: 11, color: BMHColors.inkMute, height: 1.5)),
-      ]));
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-class _GoalCard extends StatelessWidget {
-  final CategoryScore result;
-  final ScoreRange range;
-  final VoidCallback onTap;
-
-  const _GoalCard({
-    required this.result,
-    required this.range,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = _NutritionalScoreScreenState.colorFor(
-      result.score, result.hasData);
-    final weak = result.weakest;
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: BMHColors.surface,
-          borderRadius: BorderRadius.circular(BMHRadius.lg),
-          border: Border.all(color: c.withOpacity(0.22))),
-        child: Column(children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(children: [
-            // Score dial
-            SizedBox(
-              width: 46, height: 46,
-              child: Stack(alignment: Alignment.center, children: [
-                SizedBox(
-                  width: 46, height: 46,
-                  child: CircularProgressIndicator(
-                    value: (result.score / 100).clamp(0.0, 1.0),
-                    strokeWidth: 4,
-                    backgroundColor: BMHColors.bg4,
-                    valueColor: AlwaysStoppedAnimation(c))),
-                Text(result.score.round().toString(),
-                  style: BMHText.monoMd.copyWith(
-                    fontSize: 13, color: c, fontWeight: FontWeight.w700)),
-              ])),
-            const SizedBox(width: 14),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(result.category.name,
-                  style: BMHText.labelLg.copyWith(color: BMHColors.ink)),
-                const SizedBox(height: 3),
-                Text(result.category.blurb,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: BMHText.bodySm.copyWith(
-                    fontSize: 10.5, color: BMHColors.inkDim,
-                    height: 1.35)),
-              ])),
+            Container(
+              width: 7, height: 7,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle, color: BMHColors.warn)),
             const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded,
-              color: BMHColors.inkDim, size: 20),
+            Text('PROVIDER NOTES',
+              style: BMHText.monoSm.copyWith(
+                fontSize: 10, letterSpacing: 0.8,
+                color: BMHColors.ink2, fontWeight: FontWeight.w700)),
           ]),
-          if (weak != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: BMHColors.bg2,
-                borderRadius: BorderRadius.circular(BMHRadius.sm)),
-              child: Row(children: [
-                Icon(Icons.trending_up_rounded,
-                  color: c, size: 13),
-                const SizedBox(width: 7),
-                Expanded(child: Text(
-                  'Biggest gain: more ${weak.driver.label.toLowerCase()} '
-                  '(${weak.attainment.round()}% of target)',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: BMHText.monoSm.copyWith(
-                    fontSize: 9.5, color: BMHColors.inkDim))),
-              ])),
-          ],
-        ])));
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-//  GOAL DETAIL — why the score is what it is
-// ─────────────────────────────────────────────────────────
-class _GoalDetailScreen extends StatelessWidget {
-  final CategoryScore result;
-  final ScoreRange range;
-
-  const _GoalDetailScreen({required this.result, required this.range});
-
-  static String _fmt(double v) =>
-      v >= 100 ? v.round().toString()
-      : v >= 10 ? v.toStringAsFixed(0)
-      : v.toStringAsFixed(1);
-
-  @override
-  Widget build(BuildContext context) {
-    final c = _NutritionalScoreScreenState.colorFor(
-      result.score, result.hasData);
-    final drivers = [...result.drivers]
-      ..sort((a, b) => b.driver.weight.compareTo(a.driver.weight));
-
-    return Scaffold(
-      backgroundColor: BMHColors.bg0,
-      body: SafeArea(child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: BMHSpacing.s5, vertical: 8),
-          child: Row(children: [
-            BMHIconButton(
-              onTap: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back_rounded,
-                color: BMHColors.ink, size: 16)),
-            const SizedBox(width: 14),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                BMHEyebrow(range.label.toUpperCase()),
-                Text(result.category.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: BMHText.heading2),
-              ])),
-          ])),
-
-        Expanded(child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: BMHSpacing.s5),
-          children: [
-            const SizedBox(height: 6),
-
-            // Headline
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft, end: Alignment.bottomRight,
-                  colors: [c.withOpacity(0.14), BMHColors.bg2]),
-                borderRadius: BorderRadius.circular(BMHRadius.xl),
-                border: Border.all(color: c.withOpacity(0.3))),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(result.score.round().toString(),
-                        style: BMHText.displayLg.copyWith(
-                          color: c, height: 0.95)),
-                      const SizedBox(width: 6),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text('/ 100',
-                          style: BMHText.bodySm.copyWith(
-                            color: BMHColors.inkDim))),
-                      const Spacer(),
-                      BMHPill(result.band,
-                        type: result.score >= 60 ? BMHPillType.success
-                          : result.score >= 40 ? BMHPillType.warn
-                          : BMHPillType.danger),
-                    ]),
-                  const SizedBox(height: 10),
-                  Text(result.category.blurb,
-                    style: BMHText.bodySm.copyWith(
-                      fontSize: 11.5, color: BMHColors.ink2, height: 1.45)),
-                  if (range == ScoreRange.week) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Daily average across '
-                      '${result.daysWithData} of ${result.daysInRange} '
-                      'days logged',
-                      style: BMHText.monoSm.copyWith(
-                        fontSize: 9, color: BMHColors.inkMute)),
-                  ],
-                ])),
-
-            const SizedBox(height: 22),
-            BMHSectionTitle('What builds this score'),
-            const SizedBox(height: 6),
-            Text(
-              'Each nutrient counts by weight. The bar shows how much of '
-              'your ${range == ScoreRange.week ? "daily average " : ""}'
-              'target you reached.',
-              style: BMHText.bodySm.copyWith(
-                fontSize: 10.5, color: BMHColors.inkMute, height: 1.4)),
-            const SizedBox(height: 14),
-
-            for (final d in drivers) ...[
-              _DriverRow(result: d),
-              const SizedBox(height: 12),
-            ],
-
-            const SizedBox(height: 30),
-          ])),
-      ])),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-class _DriverRow extends StatelessWidget {
-  final DriverResult result;
-  const _DriverRow({required this.result});
-
-  @override
-  Widget build(BuildContext context) {
-    final att = result.attainment;
-    final color = att >= 90 ? BMHColors.success
-        : att >= 60 ? BMHColors.sGut
-        : att >= 35 ? BMHColors.warn
-        : BMHColors.danger;
-
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: BMHColors.surface,
-        borderRadius: BorderRadius.circular(BMHRadius.md),
-        border: Border.all(color: BMHColors.line)),
-      child: Column(children: [
-        Row(children: [
-          Expanded(child: Row(children: [
-            Text(result.driver.label,
-              style: BMHText.labelMd.copyWith(color: BMHColors.ink)),
-            const SizedBox(width: 6),
-            if (result.isLimit)
-              Container(
+          const SizedBox(height: 12),
+          TextField(
+            controller: controller,
+            maxLines: 5,
+            style: BMHText.bodySm.copyWith(
+              fontSize: 12, color: BMHColors.ink, height: 1.5),
+            decoration: InputDecoration(
+              hintText: 'Notes for this member, visible to the care team. '
+                  'For example observations, plan changes, or items to '
+                  'follow up at the next review.',
+              hintStyle: BMHText.bodySm.copyWith(
+                fontSize: 11.5, color: BMHColors.inkMute, height: 1.5),
+              filled: true,
+              fillColor: BMHColors.bg2,
+              contentPadding: const EdgeInsets.all(12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(BMHRadius.sm),
+                borderSide: const BorderSide(color: BMHColors.line)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(BMHRadius.sm),
+                borderSide: const BorderSide(color: BMHColors.cyan)),
+            )),
+          const SizedBox(height: 12),
+          Row(children: [
+            GestureDetector(
+              onTap: onSave,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 6, vertical: 2),
+                  horizontal: 18, vertical: 10),
                 decoration: BoxDecoration(
-                  color: BMHColors.bg4,
-                  borderRadius: BorderRadius.circular(BMHRadius.full)),
-                child: Text('KEEP UNDER',
-                  style: BMHText.monoSm.copyWith(
-                    fontSize: 7.5, letterSpacing: 0.6,
-                    color: BMHColors.inkDim))),
-          ])),
-          Text(
-            '${_GoalDetailScreen._fmt(result.consumed)} / '
-            '${_GoalDetailScreen._fmt(result.need)} '
-            '${result.driver.unit}',
-            style: BMHText.monoSm.copyWith(
-              fontSize: 10, color: BMHColors.inkDim)),
-        ]),
-        const SizedBox(height: 9),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(BMHRadius.full),
-          child: LinearProgressIndicator(
-            value: (att / 100).clamp(0.0, 1.0),
-            minHeight: 5,
-            backgroundColor: BMHColors.bg4,
-            valueColor: AlwaysStoppedAnimation(color))),
-        const SizedBox(height: 7),
-        Row(children: [
-          Text('${att.round()}%',
-            style: BMHText.monoSm.copyWith(
-              fontSize: 9.5, color: color, fontWeight: FontWeight.w700)),
-          const SizedBox(width: 8),
-          Expanded(child: Text(result.note,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: BMHText.monoSm.copyWith(
-              fontSize: 9, color: BMHColors.inkMute))),
-          Text('weight ${(result.driver.weight * 100).round()}%',
-            style: BMHText.monoSm.copyWith(
-              fontSize: 8.5, color: BMHColors.inkFaint)),
-        ]),
-      ]));
+                  color: BMHColors.cyan,
+                  borderRadius: BorderRadius.circular(BMHRadius.sm)),
+                child: Text('Save note',
+                  style: BMHText.labelMd.copyWith(
+                    fontSize: 12.5, color: BMHColors.bg0,
+                    fontWeight: FontWeight.w700)))),
+            const SizedBox(width: 12),
+            Text(status,
+              style: BMHText.monoSm.copyWith(
+                fontSize: 10, color: BMHColors.inkMute)),
+          ]),
+        ]));
   }
 }

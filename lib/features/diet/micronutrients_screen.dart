@@ -146,6 +146,11 @@ class _MicronutrientsScreenState extends State<MicronutrientsScreen> {
                   title: 'ESSENTIAL FATS',
                   items: group(MicroGroup.essentialFat),
                   totals: totals),
+                const SizedBox(height: 22),
+                _Section(
+                  title: 'DIET QUALITY',
+                  items: group(MicroGroup.dietQuality),
+                  totals: totals),
 
                 const SizedBox(height: 20),
 

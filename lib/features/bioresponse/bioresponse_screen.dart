@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────
 //  BIORESPONSE — module hub
-//  Four sections. Nutritional Score is live and reads from the
-//  BioMedical Diet log. The other three are placeholders until
-//  their data sources are wired in.
+//  Four sections, all live. Nutritional Score reads from the
+//  BioMedical Diet log and the supplement record; Biomarkers reads
+//  the blood panel; Body composition and Gut health read the
+//  measurements and the uploaded microbiome report.
 // ─────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ import '../../core/diet/diet_service.dart';
 import 'nutritional_score_screen.dart';
 import 'biomarkers_screen.dart';
 import 'body_composition_screen.dart';
+import 'gut_health_screen.dart';
 
 class BioResponseScreen extends StatefulWidget {
   const BioResponseScreen({super.key});
@@ -81,8 +83,9 @@ class _BioResponseScreenState extends State<BioResponseScreen> {
                 _AreaCard(
                   title: 'Nutritional score',
                   subtitle: hasData
-                    ? '11 goals scored from your logged meals'
-                    : 'Log a meal to start scoring',
+                    ? '33 goals across 6 categories, scored from '
+                      'your logged meals'
+                    : 'Showing the sample day until you log a meal',
                   icon: Icons.eco_outlined,
                   color: BMHColors.sGut,
                   trailing: hasData
@@ -118,7 +121,8 @@ class _BioResponseScreenState extends State<BioResponseScreen> {
                   subtitle: 'Microbiome diversity and digestion',
                   icon: Icons.biotech_outlined,
                   color: BMHColors.sDna,
-                  comingSoon: true),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const GutHealthScreen()))),
 
                 const SizedBox(height: 20),
                 _DisclaimerNote(),

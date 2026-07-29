@@ -32,7 +32,10 @@ extension MealTypeX on MealType {
 // ─────────────────────────────────────────────────────────
 //  MICRONUTRIENT
 // ─────────────────────────────────────────────────────────
-enum MicroGroup { vitamin, mineral, essentialFat }
+/// dietQuality covers the nutrients BioResponse grades against that
+/// are neither vitamin nor mineral — fibre and the two fats/sugars
+/// that carry ceilings rather than targets.
+enum MicroGroup { vitamin, mineral, essentialFat, dietQuality }
 
 class Micronutrient {
   final String name;
@@ -54,14 +57,22 @@ class Micronutrient {
     Micronutrient(name: 'Vitamin A',   unit: 'mcg', rda: 900,  group: MicroGroup.vitamin),
     Micronutrient(name: 'Vitamin B12', unit: 'mcg', rda: 2.4,  group: MicroGroup.vitamin),
     Micronutrient(name: 'Folate',      unit: 'mcg', rda: 400,  group: MicroGroup.vitamin),
+    Micronutrient(name: 'Choline',     unit: 'mg',  rda: 550,  group: MicroGroup.vitamin),
     // Minerals
     Micronutrient(name: 'Iron',        unit: 'mg',  rda: 18,   group: MicroGroup.mineral),
     Micronutrient(name: 'Magnesium',   unit: 'mg',  rda: 400,  group: MicroGroup.mineral),
     Micronutrient(name: 'Zinc',        unit: 'mg',  rda: 11,   group: MicroGroup.mineral),
     Micronutrient(name: 'Potassium',   unit: 'mg',  rda: 4700, group: MicroGroup.mineral),
     Micronutrient(name: 'Calcium',     unit: 'mg',  rda: 1000, group: MicroGroup.mineral),
+    Micronutrient(name: 'Sodium',      unit: 'mg',  rda: 2300, group: MicroGroup.mineral),
+    Micronutrient(name: 'Phosphorus',  unit: 'mg',  rda: 700,  group: MicroGroup.mineral),
+    Micronutrient(name: 'Iodine',      unit: 'mcg', rda: 150,  group: MicroGroup.mineral),
     // Essential fats
     Micronutrient(name: 'Omega-3',     unit: 'g',   rda: 1.6,  group: MicroGroup.essentialFat),
+    // Diet quality — graded against ceilings as often as targets
+    Micronutrient(name: 'Fibre',         unit: 'g', rda: 30,   group: MicroGroup.dietQuality),
+    Micronutrient(name: 'Saturated fat', unit: 'g', rda: 20,   group: MicroGroup.dietQuality),
+    Micronutrient(name: 'Added sugar',   unit: 'g', rda: 30,   group: MicroGroup.dietQuality),
   ];
 
   static Micronutrient? byName(String n) {
