@@ -1,0 +1,4089 @@
+{
+ "ruleset_version": "1.0.0",
+ "schema_version": 1,
+ "name": "GLP-1 daily monitoring",
+ "description": "Daily symptom check-in with safety screening for patients on GLP-1 receptor agonists and related incretin therapies.",
+ "effective_date": "2026-01-01",
+ "approved_by": null,
+ "approval_date": null,
+ "approval_status": "UNAPPROVED_DRAFT",
+ "governance_note": "Thresholds, patient-facing wording and escalation rules in this file have not been reviewed or approved by a licensed clinician. They must be signed off before use with patients.",
+ "config": {
+  "weekly_review_days": 7,
+  "full_review_after_dose_change": true,
+  "carry_forward_blocked_sections": [
+   "safety",
+   "opener"
+  ],
+  "unresolved_risk_carries": true,
+  "hypo_threshold_mmol": 4.0
+ },
+ "questions": [
+  {
+   "id": "feeling_today",
+   "section": "opener",
+   "text": "Overall, how are you feeling today?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Very poor",
+     "value": 0
+    },
+    {
+     "label": "Poor",
+     "value": 1
+    },
+    {
+     "label": "Fair",
+     "value": 2
+    },
+    {
+     "label": "Good",
+     "value": 3
+    },
+    {
+     "label": "Excellent",
+     "value": 4
+    }
+   ]
+  },
+  {
+   "id": "vs_yesterday",
+   "section": "opener",
+   "text": "Compared with yesterday, how are you feeling?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Much worse",
+     "value": 0
+    },
+    {
+     "label": "Slightly worse",
+     "value": 1
+    },
+    {
+     "label": "About the same",
+     "value": 2
+    },
+    {
+     "label": "Slightly better",
+     "value": 3
+    },
+    {
+     "label": "Much better",
+     "value": 4
+    }
+   ]
+  },
+  {
+   "id": "change_mode",
+   "section": "opener",
+   "text": "Have your symptoms changed since yesterday?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Everything is the same as yesterday",
+     "value": 0,
+     "mode": "same"
+    },
+    {
+     "label": "I have a few changes to report",
+     "value": 1,
+     "mode": "edit"
+    },
+    {
+     "label": "My symptoms have changed significantly",
+     "value": 2,
+     "mode": "significant"
+    },
+    {
+     "label": "This is my first check-in",
+     "value": 3,
+     "mode": "baseline"
+    }
+   ]
+  },
+  {
+   "id": "safety_abd_pain",
+   "section": "safety",
+   "text": "Do you have new, persistent or severe abdominal pain?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "mandatory": true,
+   "never_carry_forward": true
+  },
+  {
+   "id": "safety_pain_back",
+   "section": "safety",
+   "text": "Does any abdominal pain spread to your back?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "mandatory": true,
+   "never_carry_forward": true
+  },
+  {
+   "id": "safety_vomiting_repeated",
+   "section": "safety",
+   "text": "Have you repeatedly vomited today?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "mandatory": true,
+   "never_carry_forward": true
+  },
+  {
+   "id": "safety_fluids_down",
+   "section": "safety",
+   "text": "Are you unable to keep fluids down?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "mandatory": true,
+   "never_carry_forward": true
+  },
+  {
+   "id": "safety_weak_faint",
+   "section": "safety",
+   "text": "Are you experiencing severe weakness, fainting or confusion?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "mandatory": true,
+   "never_carry_forward": true
+  },
+  {
+   "id": "safety_breathing",
+   "section": "safety",
+   "text": "Are you having difficulty breathing, or swelling of your face, lips, tongue or throat?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "mandatory": true,
+   "never_carry_forward": true
+  },
+  {
+   "id": "safety_jaundice",
+   "section": "safety",
+   "text": "Do you have yellowing of your skin or eyes?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "mandatory": true,
+   "never_carry_forward": true
+  },
+  {
+   "id": "safety_urgent_help",
+   "section": "safety",
+   "text": "Do you believe your symptoms require urgent medical attention?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "mandatory": true,
+   "never_carry_forward": true
+  },
+  {
+   "id": "energy",
+   "section": "wellbeing",
+   "text": "How much energy do you have today?",
+   "type": "scale",
+   "min": 0,
+   "max": 10
+  },
+  {
+   "id": "appetite",
+   "section": "appetite",
+   "text": "Your appetite today is:",
+   "type": "single",
+   "options": [
+    {
+     "label": "Normal",
+     "value": 0
+    },
+    {
+     "label": "Slightly reduced",
+     "value": 1
+    },
+    {
+     "label": "Moderately reduced",
+     "value": 2
+    },
+    {
+     "label": "Very low",
+     "value": 3
+    },
+    {
+     "label": "No appetite",
+     "value": 4
+    }
+   ]
+  },
+  {
+   "id": "meals_ability",
+   "section": "appetite",
+   "text": "Have you been able to eat regular meals today?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Yes",
+     "value": 0
+    },
+    {
+     "label": "Smaller meals only",
+     "value": 1
+    },
+    {
+     "label": "Liquids only",
+     "value": 2
+    },
+    {
+     "label": "Very little food",
+     "value": 3
+    },
+    {
+     "label": "Unable to eat",
+     "value": 4
+    }
+   ]
+  },
+  {
+   "id": "fluids_enough",
+   "section": "appetite",
+   "text": "Are you drinking enough fluids today?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Yes",
+     "value": 0
+    },
+    {
+     "label": "Probably",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    },
+    {
+     "label": "No",
+     "value": 2
+    }
+   ]
+  },
+  {
+   "id": "nausea",
+   "section": "gi",
+   "text": "Have you experienced nausea?",
+   "type": "scale",
+   "min": 0,
+   "max": 10,
+   "bands": {
+    "mild": 1,
+    "moderate": 4,
+    "severe": 7
+   }
+  },
+  {
+   "id": "vomiting_count",
+   "section": "gi",
+   "text": "Have you vomited today?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Once",
+     "value": 1
+    },
+    {
+     "label": "2-3 times",
+     "value": 2
+    },
+    {
+     "label": "More than 3 times",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "diarrhea",
+   "section": "gi",
+   "text": "Have you had diarrhea today?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Mild",
+     "value": 1
+    },
+    {
+     "label": "Moderate",
+     "value": 2
+    },
+    {
+     "label": "Severe",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "constipation",
+   "section": "gi",
+   "text": "Have you been constipated?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Mild",
+     "value": 1
+    },
+    {
+     "label": "Moderate",
+     "value": 2
+    },
+    {
+     "label": "Severe",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "bloating",
+   "section": "gi",
+   "text": "Are you experiencing bloating?",
+   "type": "scale",
+   "min": 0,
+   "max": 10
+  },
+  {
+   "id": "reflux",
+   "section": "gi",
+   "text": "Have you noticed excessive burping or acid reflux?",
+   "type": "single",
+   "options": [
+    {
+     "label": "None",
+     "value": 0
+    },
+    {
+     "label": "Mild",
+     "value": 1
+    },
+    {
+     "label": "Moderate",
+     "value": 2
+    },
+    {
+     "label": "Severe",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "thirst",
+   "section": "hydration",
+   "text": "Are you feeling thirsty today?",
+   "type": "scale",
+   "min": 0,
+   "max": 10
+  },
+  {
+   "id": "dizzy_standing",
+   "section": "hydration",
+   "text": "Have you noticed dizziness when standing?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Never",
+     "value": 0
+    },
+    {
+     "label": "Occasionally",
+     "value": 1
+    },
+    {
+     "label": "Frequently",
+     "value": 2
+    },
+    {
+     "label": "Almost always",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "urine_color",
+   "section": "hydration",
+   "text": "Urine colour today",
+   "type": "single",
+   "options": [
+    {
+     "label": "Clear",
+     "value": 0
+    },
+    {
+     "label": "Light yellow",
+     "value": 1
+    },
+    {
+     "label": "Dark yellow",
+     "value": 2
+    },
+    {
+     "label": "Amber",
+     "value": 3
+    },
+    {
+     "label": "Brown",
+     "value": 4
+    }
+   ]
+  },
+  {
+   "id": "shaky_sweaty",
+   "section": "glucose",
+   "text": "Have you felt shaky or sweaty today?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Mild",
+     "value": 1
+    },
+    {
+     "label": "Moderate",
+     "value": 2
+    },
+    {
+     "label": "Severe",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "confusion",
+   "section": "glucose",
+   "text": "Have you experienced confusion or difficulty concentrating?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Mild",
+     "value": 1
+    },
+    {
+     "label": "Moderate",
+     "value": 2
+    },
+    {
+     "label": "Severe",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "glucose_measured",
+   "section": "glucose",
+   "text": "Have you measured your blood glucose today?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "No",
+     "value": 0
+    }
+   ]
+  },
+  {
+   "id": "glucose_lowest",
+   "section": "glucose",
+   "text": "What was your lowest reading today?",
+   "type": "number",
+   "unit": "mmol/L",
+   "show_if": {
+    "all": [
+     {
+      "q": "glucose_measured",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "injection_site",
+   "section": "injection",
+   "text": "Any redness or swelling where you injected?",
+   "type": "single",
+   "options": [
+    {
+     "label": "None",
+     "value": 0
+    },
+    {
+     "label": "Mild",
+     "value": 1
+    },
+    {
+     "label": "Moderate",
+     "value": 2
+    },
+    {
+     "label": "Severe",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "missed_dose",
+   "section": "injection",
+   "text": "Did you miss your medication this week?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    }
+   ]
+  },
+  {
+   "id": "abd_pain_severity",
+   "section": "abdominal",
+   "text": "Are you experiencing pain in the upper abdomen?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Mild discomfort",
+     "value": 1
+    },
+    {
+     "label": "Moderate pain",
+     "value": 2
+    },
+    {
+     "label": "Severe pain",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "abd_pain_score",
+   "section": "abdominal",
+   "text": "How severe is the pain, from 0 to 10?",
+   "type": "scale",
+   "min": 0,
+   "max": 10,
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "pain_back",
+   "section": "abdominal",
+   "text": "Does the pain spread into your back?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Sometimes",
+     "value": 1
+    },
+    {
+     "label": "Yes",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "pain_constant",
+   "section": "abdominal",
+   "text": "Is the pain constant?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Comes and goes",
+     "value": 1
+    },
+    {
+     "label": "Constant",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "pain_worsening",
+   "section": "abdominal",
+   "text": "Is the pain getting worse?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Slightly",
+     "value": 1
+    },
+    {
+     "label": "Yes",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "pain_worse_eating",
+   "section": "abdominal",
+   "text": "Does eating make the pain worse?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Sometimes",
+     "value": 1
+    },
+    {
+     "label": "Yes",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "pain_vomiting",
+   "section": "abdominal",
+   "text": "Are you vomiting because of the pain?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Mild nausea",
+     "value": 1
+    },
+    {
+     "label": "Vomited once",
+     "value": 2
+    },
+    {
+     "label": "Multiple episodes",
+     "value": 3
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "fever",
+   "section": "abdominal",
+   "text": "Do you have a fever?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "chills",
+   "section": "abdominal",
+   "text": "Are you experiencing chills?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "abd_tender",
+   "section": "abdominal",
+   "text": "Does your abdomen hurt when touched?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Slightly",
+     "value": 1
+    },
+    {
+     "label": "Very painful",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "pain_movement",
+   "section": "abdominal",
+   "text": "Is the pain preventing normal movement?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Somewhat",
+     "value": 1
+    },
+    {
+     "label": "Yes",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "pain_after_dose",
+   "section": "abdominal",
+   "text": "Did these symptoms begin after your injection?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Within 24 hours",
+     "value": 1
+    },
+    {
+     "label": "Within 48 hours",
+     "value": 2
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "dose_increased",
+   "section": "abdominal",
+   "text": "Have you recently increased your GLP-1 medication dose?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    }
+   ]
+  },
+  {
+   "id": "vomit_fluids_down",
+   "section": "vomiting",
+   "text": "Can you keep water or other fluids down?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Yes",
+     "value": 0
+    },
+    {
+     "label": "Sometimes",
+     "value": 1
+    },
+    {
+     "label": "No",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "vomiting_count",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "safety_vomiting_repeated",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "vomit_blood",
+   "section": "vomiting",
+   "text": "Is there blood or dark material in the vomit?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "vomiting_count",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "safety_vomiting_repeated",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "last_urination",
+   "section": "vomiting",
+   "text": "When did you last pass urine?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Within 4 hours",
+     "value": 0
+    },
+    {
+     "label": "4 to 8 hours ago",
+     "value": 1
+    },
+    {
+     "label": "8 to 12 hours ago",
+     "value": 2
+    },
+    {
+     "label": "More than 12 hours ago",
+     "value": 3
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "vomiting_count",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "safety_vomiting_repeated",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "diarrhea_count",
+   "section": "diarrhea",
+   "text": "How many bowel movements in the last 24 hours?",
+   "type": "number",
+   "show_if": {
+    "all": [
+     {
+      "q": "diarrhea",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "diarrhea_days",
+   "section": "diarrhea",
+   "text": "How many days has this lasted?",
+   "type": "number",
+   "show_if": {
+    "all": [
+     {
+      "q": "diarrhea",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "stool_blood",
+   "section": "diarrhea",
+   "text": "Is there blood in the stool?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "show_if": {
+    "all": [
+     {
+      "q": "diarrhea",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "stool_black",
+   "section": "diarrhea",
+   "text": "Is the stool black or tarry?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "show_if": {
+    "all": [
+     {
+      "q": "diarrhea",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "constipation_days",
+   "section": "constipation",
+   "text": "How many days since your last bowel movement?",
+   "type": "number",
+   "show_if": {
+    "all": [
+     {
+      "q": "constipation",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "passing_gas",
+   "section": "constipation",
+   "text": "Are you able to pass gas?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Yes",
+     "value": 0
+    },
+    {
+     "label": "No",
+     "value": 1
+    }
+   ],
+   "show_if": {
+    "all": [
+     {
+      "q": "constipation",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "abd_swelling",
+   "section": "constipation",
+   "text": "Is your abdomen swollen?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Slightly",
+     "value": 1
+    },
+    {
+     "label": "Markedly",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "all": [
+     {
+      "q": "constipation",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "meals_eaten",
+   "section": "intake",
+   "text": "How many meals have you eaten today?",
+   "type": "number",
+   "show_if": {
+    "any": [
+     {
+      "q": "appetite",
+      "op": "gte",
+      "value": 3
+     },
+     {
+      "q": "meals_ability",
+      "op": "gte",
+      "value": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "protein_able",
+   "section": "intake",
+   "text": "Are you able to consume protein?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Yes",
+     "value": 0
+    },
+    {
+     "label": "Some",
+     "value": 1
+    },
+    {
+     "label": "No",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "appetite",
+      "op": "gte",
+      "value": 3
+     },
+     {
+      "q": "meals_ability",
+      "op": "gte",
+      "value": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "rapid_weight_loss",
+   "section": "intake",
+   "text": "Have you had rapid weight loss?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "appetite",
+      "op": "gte",
+      "value": 3
+     },
+     {
+      "q": "meals_ability",
+      "op": "gte",
+      "value": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "nutrition_help",
+   "section": "intake",
+   "text": "Would you like help with a nutrition plan?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "appetite",
+      "op": "gte",
+      "value": 3
+     },
+     {
+      "q": "meals_ability",
+      "op": "gte",
+      "value": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "hypo_treated",
+   "section": "hypoglycaemia",
+   "text": "Have you treated the low glucose?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Yes",
+     "value": 0
+    },
+    {
+     "label": "No",
+     "value": 1
+    },
+    {
+     "label": "Not applicable",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "shaky_sweaty",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "confusion",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "bl_insulin",
+      "op": "eq",
+      "value": 1
+     },
+     {
+      "q": "bl_sulfonylurea",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "hypo_improved",
+   "section": "hypoglycaemia",
+   "text": "Did your symptoms improve after treatment?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Yes",
+     "value": 0
+    },
+    {
+     "label": "No",
+     "value": 1
+    },
+    {
+     "label": "Not applicable",
+     "value": 2
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "shaky_sweaty",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "confusion",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "bl_insulin",
+      "op": "eq",
+      "value": 1
+     },
+     {
+      "q": "bl_sulfonylurea",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "hypo_alone",
+   "section": "hypoglycaemia",
+   "text": "Are you on your own right now?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "shaky_sweaty",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "confusion",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "bl_insulin",
+      "op": "eq",
+      "value": 1
+     },
+     {
+      "q": "bl_sulfonylurea",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "right_rib_pain",
+   "section": "gallbladder",
+   "text": "Do you have pain under the right ribs?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    }
+   ]
+  },
+  {
+   "id": "pain_fatty_meals",
+   "section": "gallbladder",
+   "text": "Do you get pain after fatty meals?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "right_rib_pain",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "pale_stools",
+   "section": "gallbladder",
+   "text": "Are your stools pale, or your urine very dark?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ],
+   "show_if": {
+    "any": [
+     {
+      "q": "right_rib_pain",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "rash_hives",
+   "section": "allergy",
+   "text": "Do you have a new rash or hives?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    }
+   ]
+  },
+  {
+   "id": "protein_enough",
+   "section": "nutrition",
+   "text": "Are you getting enough protein?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Yes",
+     "value": 0
+    },
+    {
+     "label": "Probably",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    },
+    {
+     "label": "No",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "supplements",
+   "section": "nutrition",
+   "text": "Are you taking vitamins or supplements?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    }
+   ]
+  },
+  {
+   "id": "muscle_weakness",
+   "section": "nutrition",
+   "text": "Any muscle weakness today?",
+   "type": "scale",
+   "min": 0,
+   "max": 10
+  },
+  {
+   "id": "mood",
+   "section": "mental",
+   "text": "Mood today",
+   "type": "scale",
+   "min": 0,
+   "max": 10
+  },
+  {
+   "id": "anxiety",
+   "section": "mental",
+   "text": "Anxiety today",
+   "type": "scale",
+   "min": 0,
+   "max": 10
+  },
+  {
+   "id": "sleep_quality",
+   "section": "mental",
+   "text": "Sleep quality",
+   "type": "scale",
+   "min": 0,
+   "max": 10
+  },
+  {
+   "id": "exercised",
+   "section": "exercise",
+   "text": "Did you exercise today?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Walking",
+     "value": 1
+    },
+    {
+     "label": "Resistance training",
+     "value": 2
+    },
+    {
+     "label": "Cardio",
+     "value": 3
+    },
+    {
+     "label": "Mixed",
+     "value": 4
+    }
+   ]
+  },
+  {
+   "id": "exercise_difficulty",
+   "section": "exercise",
+   "text": "How difficult was exercise today?",
+   "type": "scale",
+   "min": 0,
+   "max": 10,
+   "show_if": {
+    "all": [
+     {
+      "q": "exercised",
+      "op": "gte",
+      "value": 1
+     }
+    ]
+   }
+  },
+  {
+   "id": "other_concerns",
+   "section": "closing",
+   "text": "Is there anything else concerning you today?",
+   "type": "text"
+  },
+  {
+   "id": "bl_medication",
+   "section": "baseline_med",
+   "text": "Which medication are you taking?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Semaglutide",
+     "value": 0
+    },
+    {
+     "label": "Tirzepatide",
+     "value": 1
+    },
+    {
+     "label": "Liraglutide",
+     "value": 2
+    },
+    {
+     "label": "Dulaglutide",
+     "value": 3
+    },
+    {
+     "label": "Exenatide",
+     "value": 4
+    },
+    {
+     "label": "Other",
+     "value": 5
+    }
+   ]
+  },
+  {
+   "id": "bl_brand",
+   "section": "baseline_med",
+   "text": "Brand name",
+   "type": "text"
+  },
+  {
+   "id": "bl_dose",
+   "section": "baseline_med",
+   "text": "Current dose",
+   "type": "number"
+  },
+  {
+   "id": "bl_dose_unit",
+   "section": "baseline_med",
+   "text": "Dose unit",
+   "type": "single",
+   "options": [
+    {
+     "label": "mg",
+     "value": 0
+    },
+    {
+     "label": "mcg",
+     "value": 1
+    },
+    {
+     "label": "units",
+     "value": 2
+    }
+   ]
+  },
+  {
+   "id": "bl_frequency",
+   "section": "baseline_med",
+   "text": "How often do you take it?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Once weekly",
+     "value": 0
+    },
+    {
+     "label": "Once daily",
+     "value": 1
+    },
+    {
+     "label": "Twice daily",
+     "value": 2
+    },
+    {
+     "label": "Other",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "bl_start_date",
+   "section": "baseline_med",
+   "text": "Date you started this medication",
+   "type": "date"
+  },
+  {
+   "id": "bl_last_dose",
+   "section": "baseline_med",
+   "text": "Date of your most recent dose",
+   "type": "date"
+  },
+  {
+   "id": "bl_last_increase",
+   "section": "baseline_med",
+   "text": "Date of your last dose increase",
+   "type": "date"
+  },
+  {
+   "id": "bl_prior_pancreatitis",
+   "section": "baseline_history",
+   "text": "Have you ever had pancreatitis?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_gallstones",
+   "section": "baseline_history",
+   "text": "Have you been told you have gallstones?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_gallbladder_disease",
+   "section": "baseline_history",
+   "text": "Have you had gallbladder disease?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_gallbladder_removed",
+   "section": "baseline_history",
+   "text": "Has your gallbladder been removed?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_high_triglycerides",
+   "section": "baseline_history",
+   "text": "Have you been told you have high triglycerides?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_kidney_disease",
+   "section": "baseline_history",
+   "text": "Do you have kidney disease?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_gastroparesis",
+   "section": "baseline_history",
+   "text": "Have you been diagnosed with gastroparesis?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_severe_gi",
+   "section": "baseline_history",
+   "text": "Do you have any severe gastrointestinal disease?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_diabetes",
+   "section": "baseline_history",
+   "text": "Do you have diabetes?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_hypoglycaemia_history",
+   "section": "baseline_history",
+   "text": "Have you had episodes of low blood sugar?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_insulin",
+   "section": "baseline_history",
+   "text": "Do you use insulin?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_sulfonylurea",
+   "section": "baseline_history",
+   "text": "Do you take a sulfonylurea?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_retinopathy",
+   "section": "baseline_history",
+   "text": "Have you been diagnosed with diabetic retinopathy?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_pregnant",
+   "section": "baseline_history",
+   "text": "Are you pregnant, or intending to become pregnant?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_allergies",
+   "section": "baseline_history",
+   "text": "Do you have any known medication allergies?",
+   "type": "single",
+   "options": [
+    {
+     "label": "No",
+     "value": 0
+    },
+    {
+     "label": "Yes",
+     "value": 1
+    },
+    {
+     "label": "I am not sure",
+     "value": -1,
+     "uncertain": true
+    }
+   ]
+  },
+  {
+   "id": "bl_alcohol",
+   "section": "baseline_history",
+   "text": "Do you drink alcohol?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Never",
+     "value": 0
+    },
+    {
+     "label": "Occasionally",
+     "value": 1
+    },
+    {
+     "label": "Weekly",
+     "value": 2
+    },
+    {
+     "label": "Daily",
+     "value": 3
+    }
+   ]
+  }
+ ],
+ "rules": [
+  {
+   "id": "R-RED-001",
+   "version": "1.0.0",
+   "name": "Severe abdominal pain",
+   "risk": "red",
+   "when": {
+    "any": [
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 3
+     },
+     {
+      "q": "abd_pain_score",
+      "op": "gte",
+      "value": 8
+     }
+    ]
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Severe abdominal pain reported.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "pancreatitis_pattern"
+   ]
+  },
+  {
+   "id": "R-RED-002",
+   "version": "1.0.0",
+   "name": "Abdominal pain radiating to back",
+   "risk": "red",
+   "when": {
+    "all": [
+     {
+      "any": [
+       {
+        "q": "safety_abd_pain",
+        "op": "eq",
+        "value": 1
+       },
+       {
+        "q": "abd_pain_severity",
+        "op": "gte",
+        "value": 1
+       }
+      ]
+     },
+     {
+      "any": [
+       {
+        "q": "safety_pain_back",
+        "op": "eq",
+        "value": 1
+       },
+       {
+        "q": "pain_back",
+        "op": "gte",
+        "value": 2
+       }
+      ]
+     }
+    ]
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Abdominal pain radiating to the back.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "pancreatitis_pattern"
+   ]
+  },
+  {
+   "id": "R-RED-003",
+   "version": "1.0.0",
+   "name": "Persistent pain radiating to back",
+   "risk": "red",
+   "when": {
+    "all": [
+     {
+      "q": "pain_constant",
+      "op": "gte",
+      "value": 2
+     },
+     {
+      "q": "pain_back",
+      "op": "gte",
+      "value": 2
+     }
+    ]
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Constant abdominal pain radiating to the back.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "pancreatitis_pattern"
+   ]
+  },
+  {
+   "id": "R-RED-004",
+   "version": "1.0.0",
+   "name": "Moderate pain with repeated vomiting",
+   "risk": "red",
+   "when": {
+    "all": [
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 2
+     },
+     {
+      "any": [
+       {
+        "q": "vomiting_count",
+        "op": "gte",
+        "value": 2
+       },
+       {
+        "q": "safety_vomiting_repeated",
+        "op": "eq",
+        "value": 1
+       }
+      ]
+     }
+    ]
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Abdominal pain with repeated vomiting.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "pancreatitis_pattern"
+   ]
+  },
+  {
+   "id": "R-RED-005",
+   "version": "1.0.0",
+   "name": "Pain with fever",
+   "risk": "red",
+   "when": {
+    "all": [
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 2
+     },
+     {
+      "q": "fever",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Abdominal pain with fever.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "pancreatitis_pattern"
+   ]
+  },
+  {
+   "id": "R-RED-006",
+   "version": "1.0.0",
+   "name": "Pain with abdominal tenderness",
+   "risk": "red",
+   "when": {
+    "all": [
+     {
+      "q": "abd_pain_severity",
+      "op": "gte",
+      "value": 2
+     },
+     {
+      "q": "abd_tender",
+      "op": "gte",
+      "value": 2
+     }
+    ]
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Abdominal pain with marked tenderness.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "pancreatitis_pattern"
+   ]
+  },
+  {
+   "id": "R-RED-007",
+   "version": "1.0.0",
+   "name": "Unable to keep fluids down with faintness",
+   "risk": "red",
+   "when": {
+    "all": [
+     {
+      "any": [
+       {
+        "q": "safety_fluids_down",
+        "op": "eq",
+        "value": 1
+       },
+       {
+        "q": "vomit_fluids_down",
+        "op": "gte",
+        "value": 2
+       }
+      ]
+     },
+     {
+      "any": [
+       {
+        "q": "safety_weak_faint",
+        "op": "eq",
+        "value": 1
+       },
+       {
+        "q": "dizzy_standing",
+        "op": "gte",
+        "value": 2
+       }
+      ]
+     }
+    ]
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Unable to tolerate fluids with dizziness or faintness.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "dehydration"
+   ]
+  },
+  {
+   "id": "R-RED-008",
+   "version": "1.0.0",
+   "name": "Breathing difficulty or airway swelling",
+   "risk": "red",
+   "when": {
+    "q": "safety_breathing",
+    "op": "eq",
+    "value": 1
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Breathing difficulty or swelling of face, lips, tongue or throat.",
+   "action": "emergency",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "allergic_reaction"
+   ]
+  },
+  {
+   "id": "R-RED-009",
+   "version": "1.0.0",
+   "name": "Vomiting blood",
+   "risk": "red",
+   "when": {
+    "q": "vomit_blood",
+    "op": "eq",
+    "value": 1
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Blood or dark material in vomit.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-RED-010",
+   "version": "1.0.0",
+   "name": "Black or bloody stool",
+   "risk": "red",
+   "when": {
+    "any": [
+     {
+      "q": "stool_black",
+      "op": "eq",
+      "value": 1
+     },
+     {
+      "q": "stool_blood",
+      "op": "eq",
+      "value": 1
+     }
+    ]
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Blood or black stool reported.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-RED-011",
+   "version": "1.0.0",
+   "name": "Jaundice with abdominal symptoms",
+   "risk": "red",
+   "when": {
+    "all": [
+     {
+      "any": [
+       {
+        "q": "safety_jaundice",
+        "op": "eq",
+        "value": 1
+       }
+      ]
+     },
+     {
+      "any": [
+       {
+        "q": "abd_pain_severity",
+        "op": "gte",
+        "value": 1
+       },
+       {
+        "q": "right_rib_pain",
+        "op": "eq",
+        "value": 1
+       }
+      ]
+     }
+    ]
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Jaundice with abdominal pain.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "gallbladder"
+   ]
+  },
+  {
+   "id": "R-RED-012",
+   "version": "1.0.0",
+   "name": "Patient requests immediate help",
+   "risk": "red",
+   "when": {
+    "q": "safety_urgent_help",
+    "op": "eq",
+    "value": 1
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Patient states they need immediate medical help.",
+   "action": "emergency",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-RED-013",
+   "version": "1.0.0",
+   "name": "Severe weakness, fainting or confusion",
+   "risk": "red",
+   "when": {
+    "q": "safety_weak_faint",
+    "op": "eq",
+    "value": 1
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Severe weakness, fainting or confusion reported.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-RED-014",
+   "version": "1.0.0",
+   "name": "Obstruction pattern",
+   "risk": "red",
+   "when": {
+    "all": [
+     {
+      "q": "passing_gas",
+      "op": "eq",
+      "value": 1
+     },
+     {
+      "q": "abd_swelling",
+      "op": "gte",
+      "value": 2
+     },
+     {
+      "any": [
+       {
+        "q": "vomiting_count",
+        "op": "gte",
+        "value": 1
+       },
+       {
+        "q": "abd_pain_severity",
+        "op": "gte",
+        "value": 2
+       }
+      ]
+     }
+    ]
+   },
+   "risk_level": "red",
+   "patient_message": "Your answers indicate symptoms that need urgent medical assessment. Seek urgent medical help now. Do not wait for a reply through this app.",
+   "clinician_message": "Unable to pass gas with abdominal swelling and vomiting.",
+   "action": "urgent_assessment",
+   "priority": 1,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-ORG-001",
+   "version": "1.0.0",
+   "name": "Moderate abdominal pain",
+   "risk": "orange",
+   "when": {
+    "all": [
+     {
+      "q": "abd_pain_severity",
+      "op": "eq",
+      "value": 2
+     }
+    ]
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Moderate abdominal pain without red-flag pattern.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "pancreatitis_pattern"
+   ]
+  },
+  {
+   "id": "R-ORG-002",
+   "version": "1.0.0",
+   "name": "Repeated vomiting",
+   "risk": "orange",
+   "when": {
+    "q": "vomiting_count",
+    "op": "gte",
+    "value": 2
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Repeated vomiting without red-flag pattern.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-ORG-003",
+   "version": "1.0.0",
+   "name": "Unable to eat",
+   "risk": "orange",
+   "when": {
+    "any": [
+     {
+      "q": "meals_ability",
+      "op": "gte",
+      "value": 3
+     },
+     {
+      "q": "appetite",
+      "op": "gte",
+      "value": 4
+     }
+    ]
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Unable to maintain normal oral intake.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "nutrition"
+   ]
+  },
+  {
+   "id": "R-ORG-004",
+   "version": "1.0.0",
+   "name": "Dehydration indicators",
+   "risk": "orange",
+   "when": {
+    "all": [
+     {
+      "q": "urine_color",
+      "op": "gte",
+      "value": 3
+     },
+     {
+      "q": "dizzy_standing",
+      "op": "gte",
+      "value": 2
+     }
+    ]
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Dehydration indicators: dark urine with postural dizziness.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "dehydration"
+   ]
+  },
+  {
+   "id": "R-ORG-005",
+   "version": "1.0.0",
+   "name": "Prolonged diarrhoea",
+   "risk": "orange",
+   "when": {
+    "all": [
+     {
+      "q": "diarrhea",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "diarrhea_days",
+      "op": "gte",
+      "value": 3
+     }
+    ]
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Diarrhoea persisting beyond the configured threshold.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-ORG-006",
+   "version": "1.0.0",
+   "name": "Severe diarrhoea",
+   "risk": "orange",
+   "when": {
+    "q": "diarrhea",
+    "op": "gte",
+    "value": 3
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Severe diarrhoea reported.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-ORG-007",
+   "version": "1.0.0",
+   "name": "Significant constipation",
+   "risk": "orange",
+   "when": {
+    "any": [
+     {
+      "q": "constipation",
+      "op": "gte",
+      "value": 3
+     },
+     {
+      "q": "constipation_days",
+      "op": "gte",
+      "value": 4
+     }
+    ]
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Significant constipation reported.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-ORG-008",
+   "version": "1.0.0",
+   "name": "Symptoms after dose escalation",
+   "risk": "orange",
+   "when": {
+    "all": [
+     {
+      "q": "dose_increased",
+      "op": "eq",
+      "value": 1
+     },
+     {
+      "any": [
+       {
+        "q": "abd_pain_severity",
+        "op": "gte",
+        "value": 1
+       },
+       {
+        "q": "vomiting_count",
+        "op": "gte",
+        "value": 1
+       },
+       {
+        "q": "nausea",
+        "op": "gte",
+        "value": 7
+       }
+      ]
+     }
+    ]
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Symptoms following recent dose escalation.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "dose_escalation"
+   ]
+  },
+  {
+   "id": "R-ORG-009",
+   "version": "1.0.0",
+   "name": "Possible gallbladder pattern",
+   "risk": "orange",
+   "when": {
+    "all": [
+     {
+      "q": "right_rib_pain",
+      "op": "eq",
+      "value": 1
+     },
+     {
+      "any": [
+       {
+        "q": "pain_fatty_meals",
+        "op": "eq",
+        "value": 1
+       },
+       {
+        "q": "pale_stools",
+        "op": "eq",
+        "value": 1
+       }
+      ]
+     }
+    ]
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Possible gallbladder symptom pattern.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "gallbladder"
+   ]
+  },
+  {
+   "id": "R-ORG-010",
+   "version": "1.0.0",
+   "name": "Untreated or unresolved hypoglycaemia",
+   "risk": "orange",
+   "when": {
+    "all": [
+     {
+      "any": [
+       {
+        "q": "bl_insulin",
+        "op": "eq",
+        "value": 1
+       },
+       {
+        "q": "bl_sulfonylurea",
+        "op": "eq",
+        "value": 1
+       }
+      ]
+     },
+     {
+      "any": [
+       {
+        "q": "shaky_sweaty",
+        "op": "gte",
+        "value": 2
+       },
+       {
+        "q": "confusion",
+        "op": "gte",
+        "value": 2
+       },
+       {
+        "q": "hypo_improved",
+        "op": "eq",
+        "value": 1
+       }
+      ]
+     }
+    ]
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Possible hypoglycaemia in a patient on insulin or a sulfonylurea.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "hypoglycaemia"
+   ]
+  },
+  {
+   "id": "R-ORG-011",
+   "version": "1.0.0",
+   "name": "Severe nausea",
+   "risk": "orange",
+   "when": {
+    "q": "nausea",
+    "op": "gte",
+    "value": 8
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Severe nausea reported.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-ORG-012",
+   "version": "1.0.0",
+   "name": "Rapid weight loss",
+   "risk": "orange",
+   "when": {
+    "q": "rapid_weight_loss",
+    "op": "eq",
+    "value": 1
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Rapid weight loss reported.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "nutrition"
+   ]
+  },
+  {
+   "id": "R-ORG-013",
+   "version": "1.0.0",
+   "name": "Allergic skin reaction",
+   "risk": "orange",
+   "when": {
+    "q": "rash_hives",
+    "op": "eq",
+    "value": 1
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "New rash or hives reported.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "allergic_reaction"
+   ]
+  },
+  {
+   "id": "R-ORG-014",
+   "version": "1.0.0",
+   "name": "Severe injection site reaction",
+   "risk": "orange",
+   "when": {
+    "q": "injection_site",
+    "op": "gte",
+    "value": 3
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Severe injection site reaction.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-YEL-001",
+   "version": "1.0.0",
+   "name": "Mild to moderate nausea",
+   "risk": "yellow",
+   "when": {
+    "all": [
+     {
+      "q": "nausea",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "nausea",
+      "op": "lte",
+      "value": 7
+     }
+    ]
+   },
+   "risk_level": "yellow",
+   "patient_message": "Your symptoms have been recorded. Keep an eye on them and report anything new or worsening.",
+   "clinician_message": "Mild to moderate nausea.",
+   "action": "monitor",
+   "priority": 3,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-YEL-002",
+   "version": "1.0.0",
+   "name": "Single vomiting episode",
+   "risk": "yellow",
+   "when": {
+    "q": "vomiting_count",
+    "op": "eq",
+    "value": 1
+   },
+   "risk_level": "yellow",
+   "patient_message": "Your symptoms have been recorded. Keep an eye on them and report anything new or worsening.",
+   "clinician_message": "Single vomiting episode.",
+   "action": "monitor",
+   "priority": 3,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-YEL-003",
+   "version": "1.0.0",
+   "name": "Mild or moderate diarrhoea",
+   "risk": "yellow",
+   "when": {
+    "all": [
+     {
+      "q": "diarrhea",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "diarrhea",
+      "op": "lte",
+      "value": 2
+     }
+    ]
+   },
+   "risk_level": "yellow",
+   "patient_message": "Your symptoms have been recorded. Keep an eye on them and report anything new or worsening.",
+   "clinician_message": "Mild or moderate diarrhoea.",
+   "action": "monitor",
+   "priority": 3,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-YEL-004",
+   "version": "1.0.0",
+   "name": "Mild or moderate constipation",
+   "risk": "yellow",
+   "when": {
+    "all": [
+     {
+      "q": "constipation",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "constipation",
+      "op": "lte",
+      "value": 2
+     }
+    ]
+   },
+   "risk_level": "yellow",
+   "patient_message": "Your symptoms have been recorded. Keep an eye on them and report anything new or worsening.",
+   "clinician_message": "Mild or moderate constipation.",
+   "action": "monitor",
+   "priority": 3,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-YEL-005",
+   "version": "1.0.0",
+   "name": "Reduced appetite",
+   "risk": "yellow",
+   "when": {
+    "all": [
+     {
+      "q": "appetite",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "appetite",
+      "op": "lte",
+      "value": 3
+     }
+    ]
+   },
+   "risk_level": "yellow",
+   "patient_message": "Your symptoms have been recorded. Keep an eye on them and report anything new or worsening.",
+   "clinician_message": "Reduced appetite.",
+   "action": "monitor",
+   "priority": 3,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-YEL-006",
+   "version": "1.0.0",
+   "name": "Mild abdominal discomfort",
+   "risk": "yellow",
+   "when": {
+    "q": "abd_pain_severity",
+    "op": "eq",
+    "value": 1
+   },
+   "risk_level": "yellow",
+   "patient_message": "Your symptoms have been recorded. Keep an eye on them and report anything new or worsening.",
+   "clinician_message": "Mild abdominal discomfort.",
+   "action": "monitor",
+   "priority": 3,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-YEL-007",
+   "version": "1.0.0",
+   "name": "Mild injection site reaction",
+   "risk": "yellow",
+   "when": {
+    "all": [
+     {
+      "q": "injection_site",
+      "op": "gte",
+      "value": 1
+     },
+     {
+      "q": "injection_site",
+      "op": "lte",
+      "value": 2
+     }
+    ]
+   },
+   "risk_level": "yellow",
+   "patient_message": "Your symptoms have been recorded. Keep an eye on them and report anything new or worsening.",
+   "clinician_message": "Mild injection site reaction.",
+   "action": "monitor",
+   "priority": 3,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-YEL-008",
+   "version": "1.0.0",
+   "name": "Missed dose",
+   "risk": "yellow",
+   "when": {
+    "q": "missed_dose",
+    "op": "eq",
+    "value": 1
+   },
+   "risk_level": "yellow",
+   "patient_message": "Your symptoms have been recorded. Keep an eye on them and report anything new or worsening.",
+   "clinician_message": "Patient reports a missed dose this week.",
+   "action": "monitor",
+   "priority": 3,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-YEL-009",
+   "version": "1.0.0",
+   "name": "Low mood or high anxiety",
+   "risk": "yellow",
+   "when": {
+    "any": [
+     {
+      "q": "mood",
+      "op": "lte",
+      "value": 3
+     },
+     {
+      "q": "anxiety",
+      "op": "gte",
+      "value": 7
+     }
+    ]
+   },
+   "risk_level": "yellow",
+   "patient_message": "Your symptoms have been recorded. Keep an eye on them and report anything new or worsening.",
+   "clinician_message": "Low mood or elevated anxiety reported.",
+   "action": "monitor",
+   "priority": 3,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": []
+  },
+  {
+   "id": "R-PER-001",
+   "version": "1.0.0",
+   "name": "Nausea persisting",
+   "risk": "orange",
+   "when": {
+    "persisted": {
+     "q": "nausea",
+     "op": "gte",
+     "value": 5,
+     "days": 3
+    }
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Nausea at or above threshold on 3 consecutive days.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "persistence"
+   ]
+  },
+  {
+   "id": "R-PER-002",
+   "version": "1.0.0",
+   "name": "Vomiting across consecutive days",
+   "risk": "orange",
+   "when": {
+    "persisted": {
+     "q": "vomiting_count",
+     "op": "gte",
+     "value": 1,
+     "days": 3
+    }
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Vomiting reported on 3 consecutive days.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "persistence"
+   ]
+  },
+  {
+   "id": "R-PER-003",
+   "version": "1.0.0",
+   "name": "Progressive reduction in intake",
+   "risk": "orange",
+   "when": {
+    "persisted": {
+     "q": "meals_ability",
+     "op": "gte",
+     "value": 2,
+     "days": 3
+    }
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Reduced oral intake sustained over 3 days.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "persistence",
+    "nutrition"
+   ]
+  },
+  {
+   "id": "R-PER-004",
+   "version": "1.0.0",
+   "name": "Diarrhoea beyond configured duration",
+   "risk": "orange",
+   "when": {
+    "persisted": {
+     "q": "diarrhea",
+     "op": "gte",
+     "value": 1,
+     "days": 3
+    }
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Diarrhoea on 3 consecutive days.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "persistence"
+   ]
+  },
+  {
+   "id": "R-PER-005",
+   "version": "1.0.0",
+   "name": "Abdominal pain sustained",
+   "risk": "orange",
+   "when": {
+    "persisted": {
+     "q": "abd_pain_severity",
+     "op": "gte",
+     "value": 1,
+     "days": 3
+    }
+   },
+   "risk_level": "orange",
+   "patient_message": "Your answers suggest symptoms that should be reviewed by a clinician. Please contact your care team.",
+   "clinician_message": "Abdominal pain reported on 3 consecutive days.",
+   "action": "clinician_review_24h",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "persistence",
+    "pancreatitis_pattern"
+   ]
+  },
+  {
+   "id": "R-UND-001",
+   "version": "1.0.0",
+   "name": "Uncertain answer on an urgent symptom",
+   "risk": "undetermined",
+   "when": {
+    "any": [
+     {
+      "q": "safety_abd_pain",
+      "op": "eq",
+      "value": -1
+     },
+     {
+      "q": "safety_pain_back",
+      "op": "eq",
+      "value": -1
+     },
+     {
+      "q": "safety_vomiting_repeated",
+      "op": "eq",
+      "value": -1
+     },
+     {
+      "q": "safety_fluids_down",
+      "op": "eq",
+      "value": -1
+     },
+     {
+      "q": "safety_weak_faint",
+      "op": "eq",
+      "value": -1
+     },
+     {
+      "q": "safety_breathing",
+      "op": "eq",
+      "value": -1
+     },
+     {
+      "q": "safety_jaundice",
+      "op": "eq",
+      "value": -1
+     },
+     {
+      "q": "safety_urgent_help",
+      "op": "eq",
+      "value": -1
+     }
+    ]
+   },
+   "risk_level": "undetermined",
+   "patient_message": "We could not complete your check-in review. Please answer the remaining questions, or contact your care team if you feel unwell.",
+   "clinician_message": "Patient answered 'not sure' to an urgent safety question.",
+   "action": "clarify_then_review",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "uncertain"
+   ]
+  },
+  {
+   "id": "R-UND-002",
+   "version": "1.0.0",
+   "name": "Mandatory safety question unanswered",
+   "risk": "undetermined",
+   "when": {
+    "unanswered_mandatory": true
+   },
+   "risk_level": "undetermined",
+   "patient_message": "We could not complete your check-in review. Please answer the remaining questions, or contact your care team if you feel unwell.",
+   "clinician_message": "Mandatory safety questions incomplete.",
+   "action": "clarify_then_review",
+   "priority": 2,
+   "effective_date": "2026-01-01",
+   "expires": null,
+   "approved_by": null,
+   "approval_date": null,
+   "countries": [
+    "*"
+   ],
+   "medications": [
+    "*"
+   ],
+   "organizations": [
+    "*"
+   ],
+   "tags": [
+    "incomplete"
+   ]
+  }
+ ],
+ "risk_modifiers": [
+  {
+   "id": "M-001",
+   "q": "bl_prior_pancreatitis",
+   "op": "eq",
+   "value": 1,
+   "weight": 3,
+   "label": "Previous pancreatitis"
+  },
+  {
+   "id": "M-002",
+   "q": "bl_gallstones",
+   "op": "eq",
+   "value": 1,
+   "weight": 2,
+   "label": "Gallstones"
+  },
+  {
+   "id": "M-003",
+   "q": "bl_gallbladder_disease",
+   "op": "eq",
+   "value": 1,
+   "weight": 2,
+   "label": "Gallbladder disease"
+  },
+  {
+   "id": "M-004",
+   "q": "bl_high_triglycerides",
+   "op": "eq",
+   "value": 1,
+   "weight": 2,
+   "label": "High triglycerides"
+  },
+  {
+   "id": "M-005",
+   "q": "bl_alcohol",
+   "op": "gte",
+   "value": 3,
+   "weight": 2,
+   "label": "Daily alcohol intake"
+  },
+  {
+   "id": "M-006",
+   "q": "dose_increased",
+   "op": "eq",
+   "value": 1,
+   "weight": 2,
+   "label": "Recent dose increase"
+  },
+  {
+   "id": "M-007",
+   "q": "fever",
+   "op": "eq",
+   "value": 1,
+   "weight": 2,
+   "label": "Fever"
+  },
+  {
+   "id": "M-008",
+   "q": "abd_tender",
+   "op": "gte",
+   "value": 1,
+   "weight": 2,
+   "label": "Abdominal tenderness"
+  },
+  {
+   "id": "M-009",
+   "q": "bl_kidney_disease",
+   "op": "eq",
+   "value": 1,
+   "weight": 1,
+   "label": "Kidney disease"
+  },
+  {
+   "id": "M-010",
+   "q": "bl_gastroparesis",
+   "op": "eq",
+   "value": 1,
+   "weight": 1,
+   "label": "Gastroparesis"
+  }
+ ]
+}

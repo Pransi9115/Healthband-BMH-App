@@ -126,7 +126,18 @@ class _NutritionalScoreScreenState extends State<NutritionalScoreScreen> {
             child: CircularProgressIndicator(
               strokeWidth: 2, color: BMHColors.cyan)))
         else
-        Expanded(child: ListView(
+        // The list scrolls under the header, so its top edge is
+        // faded out — content dissolves away instead of being cut
+        // through the middle of a line.
+        Expanded(child: ShaderMask(
+          shaderCallback: (r) => const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.transparent, Colors.black],
+            stops: [0.0, 0.035],
+          ).createShader(r),
+          blendMode: BlendMode.dstIn,
+          child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: BMHSpacing.s5),
           children: [
             Text('How your body responds to what you eat.',
@@ -150,28 +161,21 @@ class _NutritionalScoreScreenState extends State<NutritionalScoreScreen> {
             const SizedBox(height: 16),
 
             // ── CATEGORY TABS ─────────────────────────────
-            SizedBox(height: 38, child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: kCategories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final c = kCategories[i];
-                final on = c.key == _categoryKey;
-                return _Tab(
-                  label: c.name,
-                  selected: on,
-                  onTap: () => _selectCategory(c.key));
-              })),
+            // Six categories never fit a phone width, so the row
+            // scrolls and keeps the selected tab in view by itself.
+            _CategoryTabs(
+              selectedKey: _categoryKey,
+              onSelect: _selectCategory),
             const SizedBox(height: 10),
 
             // ── PROFILE CHIPS ─────────────────────────────
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final p in _svc.profilesIn(_categoryKey))
-                _Chip(
-                  label: p.name,
-                  selected: p.key == _profileKey,
-                  onTap: () => setState(() => _profileKey = p.key)),
-            ]),
+            // One scrolling line rather than a wrap: ten profiles
+            // would otherwise push the score below the fold.
+            _ProfileChips(
+              key: ValueKey(_categoryKey),
+              profiles: _svc.profilesIn(_categoryKey),
+              selectedKey: _profileKey,
+              onSelect: (k) => setState(() => _profileKey = k)),
             const SizedBox(height: 18),
 
             // ── RESULT ────────────────────────────────────
@@ -199,7 +203,7 @@ class _NutritionalScoreScreenState extends State<NutritionalScoreScreen> {
               style: BMHText.monoSm.copyWith(
                 fontSize: 9.5, color: BMHColors.inkFaint)),
             const SizedBox(height: 40),
-          ])),
+          ]))),
       ])),
     );
   }
@@ -281,6 +285,179 @@ class _Stat extends StatelessWidget {
           style: BMHText.monoSm.copyWith(
             fontSize: 10, color: BMHColors.inkDim)),
       ])));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  HORIZONTAL STRIP
+//
+//  Both the category tabs and the profile chips are rows that
+//  overflow a phone screen. Each keeps its selection scrolled
+//  into view and fades whichever edge still has content beyond
+//  it, so a clipped label reads as "there is more this way"
+//  rather than as broken text.
+// ─────────────────────────────────────────────────────────
+class _Strip extends StatefulWidget {
+  final int count;
+  final int selectedIndex;
+  final double height;
+  final Widget Function(BuildContext, int) itemBuilder;
+
+  const _Strip({
+    super.key,
+    required this.count,
+    required this.selectedIndex,
+    required this.height,
+    required this.itemBuilder,
+  });
+
+  @override
+  State<_Strip> createState() => _StripState();
+}
+
+class _StripState extends State<_Strip> {
+  final _ctrl = ScrollController();
+  late List<GlobalKey> _keys = _freshKeys();
+
+  bool _atStart = true;
+  bool _atEnd = false;
+
+  List<GlobalKey> _freshKeys() =>
+      List.generate(widget.count, (_) => GlobalKey());
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _onScroll();
+      _reveal();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _Strip old) {
+    super.didUpdateWidget(old);
+    if (old.count != widget.count) _keys = _freshKeys();
+    if (old.selectedIndex != widget.selectedIndex ||
+        old.count != widget.count) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+    }
+  }
+
+  void _onScroll() {
+    if (!_ctrl.hasClients) return;
+    final max = _ctrl.position.maxScrollExtent;
+    final at = _ctrl.offset;
+    final start = at <= 1;
+    final end = max <= 1 || at >= max - 1;
+    if (start != _atStart || end != _atEnd) {
+      setState(() { _atStart = start; _atEnd = end; });
+    }
+  }
+
+  /// Slides the selected item to the leading edge, leaving the
+  /// next one peeking so the row still reads as scrollable.
+  void _reveal() {
+    final i = widget.selectedIndex;
+    if (i < 0 || i >= _keys.length) return;
+    final ctx = _keys[i].currentContext;
+    if (ctx == null || !_ctrl.hasClients) return;
+    Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.05,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.removeListener(_onScroll);
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Fade only the edges that still have content past them.
+    final stops = <double>[0.0, _atStart ? 0.0 : 0.06,
+                           _atEnd ? 1.0 : 0.94, 1.0];
+    return SizedBox(
+      height: widget.height,
+      child: ShaderMask(
+        shaderCallback: (r) => LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: const [
+            Colors.transparent, Colors.black,
+            Colors.black, Colors.transparent,
+          ],
+          stops: stops,
+        ).createShader(r),
+        blendMode: BlendMode.dstIn,
+        child: ListView.separated(
+          controller: _ctrl,
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.zero,
+          itemCount: widget.count,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (c, i) => KeyedSubtree(
+            key: _keys[i],
+            child: widget.itemBuilder(c, i)))));
+  }
+}
+
+// ── CATEGORY TABS ─────────────────────────────────────────
+class _CategoryTabs extends StatelessWidget {
+  final String selectedKey;
+  final ValueChanged<String> onSelect;
+  const _CategoryTabs({
+    required this.selectedKey, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final i = kCategories.indexWhere((c) => c.key == selectedKey);
+    return _Strip(
+      count: kCategories.length,
+      selectedIndex: i,
+      height: 38,
+      itemBuilder: (_, n) {
+        final c = kCategories[n];
+        return _Tab(
+          label: c.name,
+          selected: c.key == selectedKey,
+          onTap: () => onSelect(c.key));
+      });
+  }
+}
+
+// ── PROFILE CHIPS ─────────────────────────────────────────
+class _ProfileChips extends StatelessWidget {
+  final List<GoalProfile> profiles;
+  final String selectedKey;
+  final ValueChanged<String> onSelect;
+
+  const _ProfileChips({
+    super.key,
+    required this.profiles,
+    required this.selectedKey,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final i = profiles.indexWhere((p) => p.key == selectedKey);
+    return _Strip(
+      count: profiles.length,
+      selectedIndex: i,
+      height: 34,
+      itemBuilder: (_, n) {
+        final p = profiles[n];
+        return _Chip(
+          label: p.name,
+          selected: p.key == selectedKey,
+          onTap: () => onSelect(p.key));
+      });
   }
 }
 
