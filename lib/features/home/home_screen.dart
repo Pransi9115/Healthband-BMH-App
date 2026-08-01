@@ -12,6 +12,7 @@ import '../health/health_screen.dart';
 import '../settings/settings_screen.dart';
 import 'main_shell.dart';
 import 'daily_checkin_screen.dart';
+import '../glp1/glp1_home_card.dart';
 import 'biomedical_monitoring_screen.dart';
 import '../diet/diet_screen.dart';
 import '../bioresponse/bioresponse_screen.dart';
@@ -139,6 +140,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         // Reload state after returning
                         _checkTodaysCheckIn();
                       }),
+                    const SizedBox(height: 14),
+                    // ── GLP-1 CHECK-IN ────────────────────
+                    // Separate from the wellness check-in above:
+                    // different questions, different cadence, and a
+                    // safety screen that must be answered daily.
+                    const Glp1HomeCard(),
                     const SizedBox(height: 40),
                     // ── TODAY'S OVERVIEW ──────────────────
                     BMHSectionTitle(
