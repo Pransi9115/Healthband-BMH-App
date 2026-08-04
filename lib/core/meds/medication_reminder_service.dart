@@ -199,6 +199,8 @@ class MedicationReminderService {
         details,
         payload: payload,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time);
     } catch (e) {
       // Exact alarms can be refused by the OS. Fall back to an inexact
@@ -216,8 +218,10 @@ class MedicationReminderService {
               'Medication reminders',
               importance: Importance.high,
               priority: Priority.high)),
-          payload: payload,
+         payload: payload,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: DateTimeComponents.time);
       } catch (e2) {
         debugPrint('Reminder could not be scheduled: $e2');
