@@ -83,8 +83,7 @@ class _BioResponseScreenState extends State<BioResponseScreen> {
                 _AreaCard(
                   title: 'Nutritional score',
                   subtitle: hasData
-                    ? '33 goals across 6 categories, scored from '
-                      'your logged meals'
+                    ? 'Regular, plus 33 goal profiles across 6 categories'
                     : 'Showing the sample day until you log a meal',
                   icon: Icons.eco_outlined,
                   color: BMHColors.sGut,
@@ -229,14 +228,14 @@ class _OverallCard extends StatelessWidget {
                 : BMHPillType.danger),
           ]),
           const SizedBox(height: 10),
-          Text('BioResponse · nutritional',
+          Text('Regular nutrition',
             style: BMHText.labelLg.copyWith(color: BMHColors.ink)),
           const SizedBox(height: 4),
           Text(
             hasData
               ? range == ScoreRange.day
-                ? 'Average across all 11 goals from today’s meals'
-                : 'Average across all 11 goals · $daysLogged of 7 days logged'
+                ? 'Everyday balance from today’s meals. No goal selected.'
+                : 'Everyday balance · $daysLogged of 7 days logged'
               : range == ScoreRange.day
                 ? 'No meals logged today yet. Log a meal in BioMedical Diet '
                   'and your score appears here.'

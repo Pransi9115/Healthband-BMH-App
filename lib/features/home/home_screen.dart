@@ -16,6 +16,8 @@ import '../glp1/glp1_home_card.dart';
 import 'biomedical_monitoring_screen.dart';
 import '../diet/diet_screen.dart';
 import '../bioresponse/bioresponse_screen.dart';
+import '../medication/medication_supplements_screen.dart';
+import '../../core/bioresponse/medication_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,6 +37,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _ble.addListener(_onBleUpdate);
+    MedicationService.instance.addListener(_onBleUpdate);
+    MedicationService.instance.init();
     _loadProfileWeight();
     _loadUserName();
     _checkTodaysCheckIn();
@@ -61,9 +65,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onBleUpdate() { if (mounted) setState(() {}); }
+
+  /// The medication card carries today's dose count rather than a
+  /// static label, so the home screen answers "have I taken them"
+  /// without opening the module.
+  String _medicationSubtitle() {
+    final svc = MedicationService.instance;
+    if (!svc.isReady) return 'Schedule · Reminders';
+    final today = DateTime.now();
+    final total = svc.dosesTotal(today);
+    if (total == 0) return 'Schedule · Reminders';
+    final taken = svc.dosesTaken(today);
+    if (taken >= total) return 'All $total doses taken today';
+    return '${total - taken} of $total doses due today';
+  }
   @override
   void dispose() {
     _ble.removeListener(_onBleUpdate);
+    MedicationService.instance.removeListener(_onBleUpdate);
     super.dispose();
   }
 
@@ -203,6 +222,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     // ── MODULES ───────────────────────────
                     BMHSectionTitle('Modules'),
                     const SizedBox(height: 16),
+                    // Order set by the care team: vitals first, then
+                    // the response to what is taken, then the two things
+                    // the patient actively logs, then the passive
+                    // monitoring modules, then the people.
                     BMHModuleCard(
                       title: 'Health Vitals',
                       subtitle: 'BioScore · 8 domains',
@@ -215,45 +238,49 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       expandedContent: _HealthModulePreview()),
                     BMHModuleCard(
-                      title: 'Bio Body Track',
-                      subtitle: 'BioScale · Composition',
-                      signalColor: BMHColors.sBody,
-                      icon: const Icon(Icons.accessibility_new_outlined),
-                      expandedContent: _BodyModulePreview()),
-                    BMHModuleCard(
-                      title: 'Biomedical Monitoring',
-                      subtitle: 'Blood · GUT · DNA',
-                      signalColor: BMHColors.sDna,
-                      icon: const Icon(Icons.biotech_outlined),
-                      expandedContent: const _BiomedicalMonitoringPreview()),
-                    BMHModuleCard(
-                      title: 'Medicines',
-                      subtitle: 'Schedule · Reminders',
-                      signalColor: BMHColors.sNervous,
-                      icon: const Icon(Icons.medication_outlined)),
-                    // FIX: this card had no onTap and no expandedContent,
-                    // so tapping it did nothing. It now opens the
-                    // BioMedical Diet module.
-                    BMHModuleCard(
-                      title: 'BioMedical Diet',
-                      subtitle: 'Meals · Kitchen · Macros',
-                      signalColor: BMHColors.sMetabolic,
-                      icon: const Icon(Icons.restaurant_menu_outlined),
-                      onTap: () => Navigator.push(context, MaterialPageRoute(
-                        builder: (_) => const DietScreen()))),
-                    // BioResponse — nutritional score now, biomarkers /
-                    // body composition / gut health to follow.
-                    BMHModuleCard(
                       title: 'BioResponse',
                       subtitle: 'Nutrition · Biomarkers · Body · Gut',
                       signalColor: BMHColors.sGut,
                       icon: const Icon(Icons.insights_outlined),
                       onTap: () => Navigator.push(context, MaterialPageRoute(
                         builder: (_) => const BioResponseScreen()))),
+                    // Was "Medicines", and was a dead card — no onTap and
+                    // no expanded content, so tapping it did nothing. It
+                    // is now the module that owns both medication and
+                    // supplements.
+                    BMHModuleCard(
+                      title: 'Medication & Supplements',
+                      subtitle: _medicationSubtitle(),
+                      signalColor: BMHColors.sDna,
+                      icon: const Icon(Icons.medication_outlined),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(
+                        builder: (_) =>
+                          const MedicationSupplementsScreen())).then((_) {
+                            if (mounted) setState(() {});
+                          })),
+                    BMHModuleCard(
+                      title: 'Biomedical Diet',
+                      subtitle: 'Meals · Kitchen · Macros',
+                      signalColor: BMHColors.sMetabolic,
+                      icon: const Icon(Icons.restaurant_menu_outlined),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => const DietScreen()))),
+                    BMHModuleCard(
+                      title: 'Biomedical Monitoring',
+                      subtitle: 'Blood · GUT · DNA',
+                      signalColor: BMHColors.sSleep,
+                      icon: const Icon(Icons.biotech_outlined),
+                      expandedContent: const _BiomedicalMonitoringPreview()),
+                    BMHModuleCard(
+                      title: 'Bio Body Track',
+                      subtitle: 'BioScale · Composition',
+                      signalColor: BMHColors.sBody,
+                      icon: const Icon(Icons.accessibility_new_outlined),
+                      expandedContent: _BodyModulePreview()),
                     BMHModuleCard(
                       title: 'Bio Care Team',
                       subtitle: 'Doctors · Coaches · Consults',
-                      signalColor: BMHColors.sSleep,
+                      signalColor: BMHColors.sNervous,
                       icon: const Icon(Icons.people_outline_rounded)),
                     const SizedBox(height: 120),
                   ]),

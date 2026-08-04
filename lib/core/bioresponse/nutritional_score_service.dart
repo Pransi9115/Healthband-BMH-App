@@ -7,8 +7,8 @@
 //  and a grade shown on the provider dashboard can never differ.
 //
 //  STRUCTURE
-//    6 categories  → the tab row
-//    33 profiles   → the chip row under the selected tab
+//    7 categories  → the tab row, Regular first and default
+//    36 profiles   → the chip row under the selected tab
 //
 //  HOW A GRADE IS BUILT
 //  Every profile is a short list of weighted criteria. A criterion
@@ -318,8 +318,13 @@ class GoalProfile {
   String get plainName => name.replaceAll(RegExp(r'\s*\(.*\)'), '');
 }
 
-// ── THE 6 TABS ────────────────────────────────────────────
+// ── THE TABS ──────────────────────────────────────────────
+// Regular comes first and is the default. Everything after it grades
+// the day against a goal; Regular grades the day against ordinary
+// good eating, so there is always a meaningful number even for
+// someone who has not chosen a goal and never will.
 const List<GoalCategory> kCategories = [
+  GoalCategory('regular', 'Regular'),
   GoalCategory('sport', 'Sports and performance'),
   GoalCategory('diet', 'Weight loss and diets'),
   GoalCategory('beauty', 'Beauty'),
@@ -328,9 +333,64 @@ const List<GoalCategory> kCategories = [
   GoalCategory('watch', 'Conditions'),
 ];
 
+/// The profile behind the headline number on the BioResponse hub.
+const String kRegularProfileKey = 'everyday_balance';
+
 // ── THE 33 PROFILES ───────────────────────────────────────
 // Declaration order is the chip order within each tab.
 const List<GoalProfile> kProfiles = [
+  // ── Regular ─────────────────────────────────────────────
+  // No goal, no plan — just whether the day was nutritionally sound.
+  // Thresholds follow general dietary reference values rather than
+  // any single protocol, so the number means the same thing for
+  // everybody.
+  GoalProfile(
+    key: 'everyday_balance', categoryKey: 'regular',
+    name: 'Everyday balance',
+    note: 'Enough protein and fibre, added sugar, sodium and saturated '
+        'fat kept in check, and the micronutrients most commonly '
+        'found low.',
+    criteria: [
+      Criterion.min('protein', 63, 40, 2),
+      Criterion.min('fibre', 30, 15, 2),
+      Criterion.max('addsugar', 25, 60, 1),
+      Criterion.max('sodium', 2000, 3500, 1),
+      Criterion.max('satfat', 20, 35, 1),
+      Criterion.min('energy', 1800, 1200, 1),
+      Criterion.min('vitd', 15, 5, 1),
+      Criterion.min('b12', 2.4, 1, 1),
+      Criterion.min('iron', 14, 8, 1),
+      Criterion.min('calcium', 1000, 600, 1),
+    ]),
+  GoalProfile(
+    key: 'heart_regular', categoryKey: 'regular',
+    name: 'Heart',
+    note: 'Sodium and saturated fat low, fibre and potassium high, '
+        'omega 3 present. The everyday pattern associated with lower '
+        'cardiovascular risk.',
+    criteria: [
+      Criterion.max('sodium', 1500, 3000, 3),
+      Criterion.max('satfat', 15, 30, 2),
+      Criterion.min('fibre', 30, 15, 2),
+      Criterion.min('potassium', 3500, 2000, 1),
+      Criterion.min('omega3', 1, 0.2, 1),
+      Criterion.max('addsugar', 25, 60, 1),
+    ]),
+  GoalProfile(
+    key: 'immunity_regular', categoryKey: 'regular',
+    name: 'Immunity',
+    note: 'Vitamin C, vitamin D and zinc at target, protein for '
+        'antibodies, vitamin A within its safety ceiling.',
+    criteria: [
+      Criterion.min('vitc', 90, 40, 2),
+      Criterion.min('vitd', 15, 5, 2),
+      Criterion.min('zinc', 11, 6, 2),
+      Criterion.min('protein', 90, 60, 1),
+      Criterion.min('vitA', 900, 400, 1),
+      Criterion.min('fibre', 30, 15, 1),
+      Criterion.hardMax('vitA', 3000, 1),
+    ]),
+
   // ── Sports and performance ──────────────────────────────
   GoalProfile(
     key: 'muscle_building', categoryKey: 'sport',
@@ -918,8 +978,27 @@ class NutritionalScoreService {
       gradeFor(p, totalsFor(day));
 
   // ── ROLL-UPS USED BY THE MODULE HUB ─────────────────────
-  /// Mean grade across every profile — the headline BioResponse number.
-  double overallFor(DateTime day) {
+  /// The Regular profile — everyday balance, no goal required.
+  GoalProfile get regularProfile =>
+      profileByKey(kRegularProfileKey) ?? kProfiles.first;
+
+  /// Grade of the Regular profile for a day.
+  Grade regularGradeFor(DateTime day) =>
+      gradeFor(regularProfile, totalsFor(day));
+
+  /// The headline BioResponse number.
+  ///
+  /// This used to be the mean of all 33 goal profiles, which scored
+  /// the patient against goals they had never chosen — a vegan grade
+  /// for someone who eats meat dragged the headline down for no
+  /// reason. It is now the Regular grade: what ordinary good eating
+  /// looks like, which is a number anybody can read.
+  double overallFor(DateTime day) =>
+      regularGradeFor(day).score.toDouble();
+
+  /// The old behaviour, kept for anything that genuinely wants the
+  /// mean across every goal profile.
+  double meanAcrossAllProfilesFor(DateTime day) {
     final t = totalsFor(day);
     if (kProfiles.isEmpty) return 0;
     final sum = kProfiles.fold<int>(0, (a, p) => a + gradeFor(p, t).score);

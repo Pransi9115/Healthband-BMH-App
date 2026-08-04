@@ -528,16 +528,17 @@ class _BMHModuleCardState extends State<BMHModuleCard>
                   onTap: _toggle,
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
-                    padding: const EdgeInsets.all(BMHSpacing.s4 + 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: BMHSpacing.s4, vertical: BMHSpacing.s4 - 2),
                     child: Row(
                       children: [
                         // Icon
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
-                          width: 44, height: 44,
+                          width: 40, height: 40,
                           decoration: BoxDecoration(
                             color: _open ? color : BMHColors.signalBg(color),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(11),
                             border: Border.all(color: _open ? color : BMHColors.signalBorder(color)),
                             boxShadow: _open ? BMHShadows.glow(color) : [],
                           ),
@@ -545,20 +546,40 @@ class _BMHModuleCardState extends State<BMHModuleCard>
                             child: IconTheme(
                               data: IconThemeData(
                                 color: _open ? BMHColors.bg0 : color,
-                                size: 20,
+                                size: 19,
                               ),
                               child: widget.icon,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 12),
+                        // Long module names — "Medication & Supplements",
+                        // "Biomedical Monitoring" — must never wrap to a
+                        // second line or clip. FittedBox shrinks the title
+                        // on narrow phones instead of doing either.
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(widget.title, style: BMHText.heading2),
-                              const SizedBox(height: 4),
-                              Text(widget.subtitle.toUpperCase(), style: BMHText.monoSm),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  widget.title,
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  overflow: TextOverflow.visible,
+                                  style: BMHText.heading2.copyWith(
+                                    fontSize: 19),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                widget.subtitle.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: BMHText.monoSm.copyWith(fontSize: 9.5),
+                              ),
                             ],
                           ),
                         ),

@@ -10,6 +10,8 @@ import 'core/health/vital_history_service.dart';
 import 'core/health/health_service.dart';
 import 'core/diet/diet_service.dart';
 import 'core/battery/battery_service.dart';
+import 'core/bioresponse/medication_service.dart';
+import 'core/meds/medication_reminder_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +62,13 @@ void main() async {
   await VitalHistoryService.instance.init();
   await DietService.instance.init(); // diet log persistence
   await BatteryService.instance.init(); // live battery + low alerts
+
+  // Medication schedule, then its reminders. Reminders are rebuilt on
+  // every launch so they survive reinstalls, permission changes and a
+  // device reboot, and so a finished course stops nagging.
+  await MedicationService.instance.init();
+  await MedicationReminderService.instance.init();
+  await MedicationReminderService.instance.syncAll();
 
   // ── Request permissions on iOS at startup ────────────
   // This makes all permissions appear in iOS Settings
