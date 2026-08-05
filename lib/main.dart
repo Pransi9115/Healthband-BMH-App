@@ -8,6 +8,7 @@ import 'features/auth/splash_screen.dart';
 import 'core/ble/ble_service.dart';
 import 'core/health/vital_history_service.dart';
 import 'core/health/health_service.dart';
+import 'core/health/health_share_service.dart';
 import 'core/diet/diet_service.dart';
 import 'core/battery/battery_service.dart';
 import 'core/bioresponse/medication_service.dart';
@@ -62,6 +63,12 @@ void main() async {
   await VitalHistoryService.instance.init();
   await DietService.instance.init(); // diet log persistence
   await BatteryService.instance.init(); // live battery + low alerts
+
+  // Health sharing — pushes band vitals into Apple Health or Health
+  // Connect so the patient's other apps can read them. Initialising
+  // here registers the lifecycle observer, so a sync fires whenever
+  // the app returns to the foreground.
+  await HealthShareService.instance.init();
 
   // Medication schedule, then its reminders. Reminders are rebuilt on
   // every launch so they survive reinstalls, permission changes and a

@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../shared/theme/bmh_tokens.dart';
+import 'health_sharing_screen.dart';
+import '../../core/health/health_share_service.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_global_nav.dart';
 import '../home/daily_checkin_screen.dart';
@@ -378,6 +381,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _save('unit_glucose', v);
               }),
           ]),
+
+          const SizedBox(height: 28),
+
+          // ── CONNECTED APPS ────────────────────────────
+          // Band vitals out to the phone's health store, so the
+          // patient's other apps can read what BMH measures.
+          _SectionLabel('Connected Apps'),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: BMHColors.surface,
+              borderRadius: BorderRadius.circular(BMHRadius.lg),
+              border: Border.all(color: BMHColors.line)),
+            child: ListTile(
+              leading: Container(
+                width: 38, height: 38,
+                decoration: BoxDecoration(
+                  color: BMHColors.sCardio.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: BMHColors.sCardio.withOpacity(0.3))),
+                child: Icon(
+                  Platform.isIOS
+                    ? Icons.favorite_rounded
+                    : Icons.health_and_safety_outlined,
+                  color: BMHColors.sCardio, size: 18)),
+              title: Text(HealthShareService.storeName,
+                style: BMHText.bodyMd),
+              subtitle: Text(
+                HealthShareService.instance.isEnabled
+                  ? 'Sharing on · other apps can see your band data'
+                  : 'Share your band data with other apps',
+                style: BMHText.monoSm.copyWith(
+                  fontSize: 9, color: BMHColors.inkMute)),
+              trailing: const Icon(Icons.chevron_right_rounded,
+                color: BMHColors.inkMute, size: 18),
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const HealthSharingScreen()))
+                  .then((_) { if (mounted) setState(() {}); }))),
 
           const SizedBox(height: 28),
 

@@ -96,6 +96,19 @@ class VitalHistoryService extends ChangeNotifier {
     'blood_glucose', 'sleep',
   ];
 
+  /// Stored readings for [key] newer than [since], oldest first.
+  ///
+  /// Used by HealthShareService when backfilling into Apple Health or
+  /// Health Connect, so the store gets the real timestamp each reading
+  /// was taken at rather than the moment it was uploaded.
+  List<VitalReading> readingsSince(String key, DateTime since) {
+    final list = _cache[key];
+    if (list == null || list.isEmpty) return const [];
+    final out = list.where((r) => r.timestamp.isAfter(since)).toList();
+    out.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return out;
+  }
+
   // ── RECORD WITH EXACT TIMESTAMP (for band history) ───
   Future<void> recordAt(String key, DateTime timestamp, double value) async {
     if (value <= 0) return;
