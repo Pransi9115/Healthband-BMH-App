@@ -11,6 +11,7 @@ import '../body/ble/device_management_screen.dart';
 import '../health/health_screen.dart';
 import '../settings/settings_screen.dart';
 import 'main_shell.dart';
+import 'daily_checkin_screen.dart';
 import 'daily_checkin_section.dart';
 import 'biomedical_monitoring_screen.dart';
 import '../diet/diet_screen.dart';
