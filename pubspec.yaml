@@ -1,7 +1,7 @@
 ﻿name: bmh_app
 description: BioMedical Healthcare — BMH Mobile App
 publish_to: 'none'
-version: 1.0.0+102
+version: 1.0.0+103
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -56,3 +56,4 @@ flutter:
     - assets/images/
     - assets/lottie/
     - assets/images/exercises/
+    - assets/glp1/

@@ -54,6 +54,7 @@ class _Glp1CheckInScreenState extends State<Glp1CheckInScreen> {
   List<Question> _queue = [];
   bool _submitting = false;
   String? _error;
+  String? _errorDetail;
 
   Ruleset get _rs => _svc.ruleset;
 
@@ -72,10 +73,25 @@ class _Glp1CheckInScreenState extends State<Glp1CheckInScreen> {
             _svc.hasBaseline ? CheckInMode.same : CheckInMode.baseline);
         _stage = _Stage.opener;
       });
-    } catch (e) {
+    } catch (e, st) {
+      // The whole questionnaire — questions, thresholds, safety rules —
+      // is loaded from the ruleset asset. A missing asset declaration
+      // fails here and used to surface as a generic "try again", which
+      // sent people round the same loop forever. Name the real cause.
+      debugPrint('[GLP1] boot failed: $e');
+      debugPrint('$st');
+      final missingAsset = e is FlutterError ||
+          '$e'.contains('Unable to load asset') ||
+          '$e'.contains(kRulesetAsset);
       setState(() {
-        _error = 'The check-in could not be loaded. Please try again, '
-            'and contact your care team if you feel unwell.';
+        _error = missingAsset
+          ? 'The check-in questions could not be loaded because a setup '
+            'file is missing from this build. Your saved answers are '
+            'safe. Please update the app, and contact your care team if '
+            'you feel unwell.'
+          : 'The check-in could not be loaded. Please try again, and '
+            'contact your care team if you feel unwell.';
+        _errorDetail = '$e';
         _stage = _Stage.opener;
       });
     }
@@ -292,7 +308,33 @@ class _Glp1CheckInScreenState extends State<Glp1CheckInScreen> {
       Text(_error!, textAlign: TextAlign.center,
         style: BMHText.bodyMd.copyWith(
           color: BMHColors.ink2, height: 1.55)),
+      if (_errorDetail != null) ...[
+        const SizedBox(height: 18),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            color: BMHColors.bg2,
+            borderRadius: BorderRadius.circular(BMHRadius.md),
+            border: Border.all(color: BMHColors.line)),
+          child: Text(_errorDetail!,
+            style: BMHText.monoSm.copyWith(
+              fontSize: 9, color: BMHColors.inkMute, height: 1.4))),
+      ],
       const Spacer(),
+      // Retry rather than a dead end: a transient read failure should
+      // not need the app restarted.
+      GestureDetector(
+        onTap: () {
+          setState(() { _error = null; _errorDetail = null; });
+          _boot();
+        },
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Text('Try again',
+            textAlign: TextAlign.center,
+            style: BMHText.labelLg.copyWith(color: BMHColors.cyan)))),
       Glp1Button(label: 'Close', onTap: () => Navigator.pop(context)),
     ]));
 
