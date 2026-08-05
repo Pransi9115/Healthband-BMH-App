@@ -71,9 +71,87 @@ class _HealthSharingScreenState extends State<HealthSharingScreen> {
       return;
     }
     final ok = await _svc.setEnabled(true);
-    _snack(ok
-      ? 'Sharing with ${HealthShareService.storeName} is on'
-      : 'Permission was not granted', bad: !ok);
+    if (ok) {
+      _snack('Sharing with ${HealthShareService.storeName} is on');
+    } else {
+      await _showPermissionHelp();
+    }
+  }
+
+  /// A snackbar saying "permission was not granted" tells someone
+  /// nothing they can act on — especially on iOS, where the system
+  /// sheet only ever appears once. This explains where to go.
+  Future<void> _showPermissionHelp() async {
+    final store = HealthShareService.storeName;
+    final detail = _svc.permissionDetail;
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: BMHColors.bg3,
+        title: Text('$store did not grant access',
+          style: BMHText.heading3),
+        content: SingleChildScrollView(child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              Platform.isIOS
+                ? 'iOS shows the Health permission sheet only once. If '
+                  'you have seen it before, tapping again does nothing '
+                  'and you have to switch BMH on by hand:'
+                : 'Health Connect keeps its own permission list. Switch '
+                  'BMH on there:',
+              style: BMHText.bodySm.copyWith(
+                color: BMHColors.ink2, height: 1.5)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: BMHColors.bg2,
+                borderRadius: BorderRadius.circular(BMHRadius.md),
+                border: Border.all(color: BMHColors.line)),
+              child: Text(
+                Platform.isIOS
+                  ? 'Settings  ›  Health  ›  Data Access & Devices  ›  '
+                    'BMH  ›  Turn All Categories On'
+                  : 'Health Connect  ›  App permissions  ›  BMH  ›  '
+                    'Allow all',
+                style: BMHText.monoSm.copyWith(
+                  fontSize: 10.5, color: BMHColors.ink, height: 1.6))),
+            if (detail != null) ...[
+              const SizedBox(height: 14),
+              Text('DETAIL',
+                style: BMHText.monoSm.copyWith(
+                  fontSize: 8, letterSpacing: 1.2,
+                  color: BMHColors.inkMute)),
+              const SizedBox(height: 5),
+              Text(detail,
+                style: BMHText.monoSm.copyWith(
+                  fontSize: 9.5, color: BMHColors.inkMute, height: 1.45)),
+            ],
+          ])),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Close',
+              style: BMHText.labelMd.copyWith(color: BMHColors.inkDim))),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await _svc.requestPermission();
+              if (ok) {
+                await _svc.setEnabled(true);
+                _snack('Sharing is on');
+              } else {
+                _snack('Still no access — check the steps above',
+                  bad: true);
+              }
+            },
+            child: Text('Try again',
+              style: BMHText.labelMd.copyWith(color: _accent))),
+        ]));
+    if (mounted) setState(() {});
   }
 
   Future<void> _showInstallPrompt() async {
@@ -430,7 +508,8 @@ class _HealthSharingScreenState extends State<HealthSharingScreen> {
         if (!_svc.isStoreAvailable && Platform.isAndroid) {
           await _showInstallPrompt();
         } else {
-          await _svc.requestPermission();
+          final granted = await _svc.requestPermission();
+          if (!granted) await _showPermissionHelp();
         }
       },
       behavior: HitTestBehavior.opaque,

@@ -21,11 +21,27 @@ import '../../shared/theme/bmh_tokens.dart';
 import '../../core/bioresponse/blood_report_service.dart';
 
 // ── shared helpers ────────────────────────────────────────
+//
+//  COLOUR SCALE
+//  Below range is orange, inside range is green, above range is red.
+//  Low and high are deliberately different colours: a low ferritin and
+//  a high ferritin are opposite problems needing opposite action, and
+//  painting both the same red loses that entirely.
+//
+//  Anything above its range is red, with no exceptions. A high HDL is
+//  clinically a good result, but a patient scanning a list of forty
+//  markers should not have to know which ones invert — a value outside
+//  its reference range is a value to ask about, and the colour says so
+//  consistently. The favourable case is explained in the marker's own
+//  detail text instead, where there is room to say why.
+//
+//  highIsGood is kept in the signature so callers do not all have to
+//  change, and so the distinction stays available to the copy.
 Color markerColor(MarkerStatus s, bool highIsGood) => switch (s) {
-      MarkerStatus.low => BMHColors.warn,
-      MarkerStatus.high => highIsGood ? BMHColors.success : BMHColors.danger,
-      MarkerStatus.borderline => BMHColors.sMetabolic,
-      MarkerStatus.inRange => BMHColors.success,
+      MarkerStatus.low => BMHColors.rangeLow,
+      MarkerStatus.high => BMHColors.rangeHigh,
+      MarkerStatus.borderline => BMHColors.rangeEdge,
+      MarkerStatus.inRange => BMHColors.rangeIn,
     };
 
 String fmtNum(double v) {
@@ -42,15 +58,24 @@ String fmtDate(DateTime d) {
 }
 
 /// The label the report itself would print for a result.
+///
+/// HIGH and LOW are deliberately blunt. "Above range" reads as a
+/// description; HIGH reads as something to act on, which is what an
+/// out-of-range result is. The favourable nuance for markers where a
+/// high value is welcome moves into the detail text.
 String reportLabel(BloodMarker m) {
-  if (m.isFavourable) return 'Favourable';
   return switch (m.status) {
-    MarkerStatus.low => 'Below range',
-    MarkerStatus.high => 'Above range',
+    MarkerStatus.low => 'LOW',
+    MarkerStatus.high => 'HIGH',
     MarkerStatus.borderline => 'Keep an eye on',
     MarkerStatus.inRange => 'In range',
   };
 }
+
+/// True when the status deserves the heavier, attention-seeking
+/// treatment on screen.
+bool isFlagLabel(MarkerStatus s) =>
+    s == MarkerStatus.high || s == MarkerStatus.low;
 
 // ─────────────────────────────────────────────────────────
 //  MASTHEAD — the report's own opening
@@ -170,10 +195,11 @@ class ReportCounts extends StatelessWidget {
           ]),
           const SizedBox(height: 16),
           Row(children: [
-            _stat('${r.concernCount}', 'Outside\nrange', BMHColors.danger),
+            _stat('${r.concernCount}', 'Outside\nrange',
+              BMHColors.rangeHigh),
             _stat('${r.borderlineCount}', 'Keep an\neye on',
-              BMHColors.sMetabolic),
-            _stat('${r.inRangeCount}', 'In\nrange', BMHColors.success),
+              BMHColors.rangeEdge),
+            _stat('${r.inRangeCount}', 'In\nrange', BMHColors.rangeIn),
             _stat('${r.totalCount}', 'Total\nmarkers', BMHColors.cyan),
           ]),
           if (showFootnotes &&
@@ -182,12 +208,12 @@ class ReportCounts extends StatelessWidget {
             const Divider(color: BMHColors.line, height: 1),
             const SizedBox(height: 12),
             if (r.priorityCount > 0)
-              _line(Icons.priority_high_rounded, BMHColors.danger,
+              _line(Icons.priority_high_rounded, BMHColors.rangeHigh,
                 '${r.priorityCount} of the ${r.concernCount} outside range '
                 'are the ones to raise with your doctor first'),
             if (r.favourableCount > 0) ...[
               const SizedBox(height: 8),
-              _line(Icons.check_circle_outline_rounded, BMHColors.success,
+              _line(Icons.check_circle_outline_rounded, BMHColors.rangeIn,
                 '${r.favourableCount} marker above its range is a good '
                 'result, not a concern'),
             ],
@@ -384,10 +410,17 @@ class _ReportMarkerRowState extends State<ReportMarkerRow> {
                 style: BMHText.monoMd.copyWith(
                   fontSize: 12, color: c, fontWeight: FontWeight.w700)),
               const SizedBox(height: 3),
+              // HIGH and LOW get the loud treatment: bigger, bolder,
+              // wider tracking. In range stays quiet — a patient should
+              // be able to scan a forty-marker list and have their eye
+              // caught only by what matters.
               Text(reportLabel(m).toUpperCase(),
                 style: BMHText.monoSm.copyWith(
-                  fontSize: 7.5, letterSpacing: 0.6,
-                  color: c, fontWeight: FontWeight.w700)),
+                  fontSize: isFlagLabel(m.status) ? 10 : 7.5,
+                  letterSpacing: isFlagLabel(m.status) ? 1.2 : 0.6,
+                  color: c,
+                  fontWeight: isFlagLabel(m.status)
+                    ? FontWeight.w900 : FontWeight.w700)),
             ]),
             if (expandable) ...[
               const SizedBox(width: 4),
@@ -484,29 +517,56 @@ class ReferenceBar extends StatelessWidget {
       final w = box.maxWidth;
       final zs = marker.zoneStart, ze = marker.zoneEnd;
       final pos = marker.barPosition;
+
+      // Three zones, left to right: below range, inside range, above
+      // range. Reading the bar should tell you which direction you are
+      // off in without reading the number.
+      final lowW = (zs * w).clamp(0.0, w);
+      final inW = ((ze - zs) * w).clamp(2.0, w);
+      final highW = ((1 - ze) * w).clamp(0.0, w);
+
       return SizedBox(height: 20, child: Stack(children: [
+        // below range — orange
         Positioned(
-          left: 0, right: 0, top: 7,
+          left: 0, width: lowW, top: 7,
           child: Container(
             height: 7,
-            decoration: BoxDecoration(
-              color: BMHColors.danger.withOpacity(0.16),
-              borderRadius: BorderRadius.circular(BMHRadius.full)))),
+            decoration: const BoxDecoration(
+              color: BMHColors.rangeLow,
+              borderRadius: BorderRadius.horizontal(
+                left: Radius.circular(BMHRadius.full))))),
+        // inside range — green
         Positioned(
-          left: zs * w, width: ((ze - zs) * w).clamp(2.0, w), top: 7,
+          left: zs * w, width: inW, top: 7,
           child: Container(
             height: 7,
-            decoration: BoxDecoration(
-              color: BMHColors.success.withOpacity(0.48),
-              borderRadius: BorderRadius.circular(BMHRadius.full)))),
+            color: BMHColors.rangeIn)),
+        // above range — red
         Positioned(
-          left: (pos * w - 4).clamp(0.0, w - 8), top: 1,
+          left: ze * w, width: highW, top: 7,
+          child: Container(
+            height: 7,
+            decoration: const BoxDecoration(
+              color: BMHColors.rangeHigh,
+              borderRadius: BorderRadius.horizontal(
+                right: Radius.circular(BMHRadius.full))))),
+        // the needle at the actual result
+        Positioned(
+          left: (pos * w - 4).clamp(0.0, w - 8), top: 0,
           child: Column(children: [
             Container(
               width: 8, height: 6,
               decoration: BoxDecoration(
-                color: color, borderRadius: BorderRadius.circular(2))),
-            Container(width: 2, height: 13, color: color),
+                color: color,
+                borderRadius: BorderRadius.circular(2),
+                border: Border.all(color: BMHColors.bg0, width: 0.5))),
+            Container(
+              width: 3, height: 15,
+              decoration: BoxDecoration(
+                color: color,
+                border: Border.symmetric(
+                  vertical: BorderSide(
+                    color: BMHColors.bg0.withOpacity(0.8), width: 0.5)))),
           ])),
       ]));
     });
@@ -647,9 +707,10 @@ class ReportLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Wrap(
     spacing: 14, runSpacing: 6, children: [
-      _key(BMHColors.success, 'Where it should sit'),
-      _key(BMHColors.sMetabolic, 'Keep an eye on'),
-      _key(BMHColors.danger, 'Outside the range'),
+      _key(BMHColors.rangeLow, 'Below the range'),
+      _key(BMHColors.rangeIn, 'Where it should sit'),
+      _key(BMHColors.rangeEdge, 'Keep an eye on'),
+      _key(BMHColors.rangeHigh, 'Above the range'),
     ]);
 
   Widget _key(Color c, String label) => Row(
@@ -765,7 +826,7 @@ class _TrendPainter extends CustomPainter {
     final band = size.height * 0.30;
 
     // the in-range corridor
-    final corridor = Paint()..color = BMHColors.success.withOpacity(0.10);
+    final corridor = Paint()..color = BMHColors.rangeIn.withOpacity(0.13);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(0, midY - band, size.width, band * 2),
@@ -773,7 +834,7 @@ class _TrendPainter extends CustomPainter {
       corridor);
 
     final centre = Paint()
-      ..color = BMHColors.success.withOpacity(0.35)
+      ..color = BMHColors.rangeIn.withOpacity(0.40)
       ..strokeWidth = 1;
     canvas.drawLine(Offset(0, midY), Offset(size.width, midY), centre);
 

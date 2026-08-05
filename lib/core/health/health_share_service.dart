@@ -293,7 +293,9 @@ class HealthShareService extends ChangeNotifier with WidgetsBindingObserver {
     _configured = true;
   }
 
-  List<HealthDataType> get _activeTypes {
+  /// Types we write. This is the list that actually matters — sharing
+  /// is a write operation.
+  List<HealthDataType> get _writeTypes {
     final out = <HealthDataType>[];
     for (final m in kShareMetrics) {
       if (m.key == 'blood_pressure') {
@@ -306,6 +308,20 @@ class HealthShareService extends ChangeNotifier with WidgetsBindingObserver {
     }
     return out;
   }
+
+  /// Types we read back, and only to fill a gap the band left. Kept
+  /// small on purpose: asking for read access to everything makes the
+  /// iOS permission sheet look far more invasive than what we do.
+  List<HealthDataType> get _readTypes => [
+        HealthDataType.STEPS,
+        HealthDataType.SLEEP_ASLEEP,
+      ];
+
+  /// Human-readable detail about the last permission attempt, shown in
+  /// settings so a failure can be diagnosed from a screenshot instead
+  /// of a debug console.
+  String? _permissionDetail;
+  String? get permissionDetail => _permissionDetail;
 
   /// Is there a health store to write to at all? On Android this is
   /// false when Health Connect is missing or needs updating.
@@ -325,18 +341,25 @@ class HealthShareService extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint('[HealthShare] availability check failed: $e');
       _storeAvailable = false;
       _permitted = false;
+      _permissionDetail = '$e';
     }
     notifyListeners();
   }
 
+  /// Do we hold WRITE access?
+  ///
+  /// Write is the only status HealthKit will actually disclose. Read
+  /// status is deliberately hidden by Apple — an app must not be able
+  /// to tell "denied" from "no data", or it could infer the existence
+  /// of a condition from the refusal. So asking about READ_WRITE gets
+  /// a null or a false that means nothing, which is precisely what
+  /// made the toggle report failure after a successful grant.
   Future<bool> _checkPermission() async {
     try {
-      final types = _activeTypes;
+      final types = _writeTypes;
       final has = await _health.hasPermissions(
         types,
-        permissions: types.map((_) => HealthDataAccess.READ_WRITE).toList());
-      // iOS deliberately never reveals read permission, so hasPermissions
-      // can return null there. Treat null as "ask and find out".
+        permissions: types.map((_) => HealthDataAccess.WRITE).toList());
       return has ?? false;
     } catch (e) {
       debugPrint('[HealthShare] permission check failed: $e');
@@ -344,19 +367,94 @@ class HealthShareService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Requests access, and refuses to take a bare `false` for an answer.
+  ///
+  /// Three things go wrong with a single bulk request:
+  ///   1. HealthKit rejects the whole batch if one type in it is not
+  ///      recognised, so nine good types fail because of a tenth.
+  ///   2. The plugin returns false when the sheet was dismissed
+  ///      without an explicit denial, which is not a refusal.
+  ///   3. Read status is never disclosed, so READ_WRITE can never be
+  ///      confirmed even when everything was granted.
+  ///
+  /// So: ask for the batch, then verify against write status. If the
+  /// batch failed, ask per type and keep whatever succeeded.
   Future<bool> requestPermission() async {
+    _permissionDetail = null;
     try {
       await _ensureConfigured();
-      final types = _activeTypes;
-      final granted = await _health.requestAuthorization(
-        types,
-        permissions: types.map((_) => HealthDataAccess.READ_WRITE).toList());
-      _permitted = granted;
+
+      final writes = _writeTypes;
+      final reads = _readTypes;
+
+      // Everything we touch, with the narrowest access that does the
+      // job: write for what we share, read only for the two we pull.
+      final types = <HealthDataType>[...writes];
+      final access = <HealthDataAccess>[
+        for (final _ in writes) HealthDataAccess.WRITE];
+      for (final r in reads) {
+        final i = types.indexOf(r);
+        if (i >= 0) {
+          access[i] = HealthDataAccess.READ_WRITE;
+        } else {
+          types.add(r);
+          access.add(HealthDataAccess.READ);
+        }
+      }
+
+      var granted = false;
+      try {
+        granted = await _health.requestAuthorization(
+          types, permissions: access);
+      } catch (e) {
+        debugPrint('[HealthShare] bulk request threw: $e');
+        _permissionDetail = 'Bulk request failed: $e';
+      }
+
+      // The bulk call is a hint, not the truth. Write status is.
+      var confirmed = await _checkPermission();
+
+      if (!confirmed && !granted) {
+        // One unrecognised type can sink the whole batch. Ask again,
+        // one at a time, and keep whatever the platform accepts.
+        final failed = <String>[];
+        for (var i = 0; i < types.length; i++) {
+          try {
+            await _health.requestAuthorization(
+              [types[i]], permissions: [access[i]]);
+          } catch (e) {
+            failed.add(types[i].name);
+            debugPrint('[HealthShare] ${types[i].name} refused: $e');
+          }
+        }
+        confirmed = await _checkPermission();
+        if (!confirmed && failed.isNotEmpty) {
+          _permissionDetail =
+            'These types were rejected: ${failed.join(", ")}';
+        }
+      }
+
+      // iOS will not confirm anything until at least one sample lands,
+      // in some versions. If the sheet was completed and nothing threw,
+      // trust it and let the first write be the real test.
+      if (!confirmed && granted) confirmed = true;
+
+      _permitted = confirmed;
+      if (!confirmed && _permissionDetail == null) {
+        _permissionDetail = Platform.isIOS
+          ? 'iOS reported no write access. If you have already seen the '
+            'Health permission sheet once, iOS will not show it again — '
+            'turn BMH on manually under Settings, Health, Data Access '
+            'and Devices.'
+          : 'Health Connect reported no write access. Check BMH under '
+            'Health Connect, App permissions.';
+      }
       notifyListeners();
-      return granted;
+      return confirmed;
     } catch (e) {
       debugPrint('[HealthShare] permission request failed: $e');
       _permitted = false;
+      _permissionDetail = '$e';
       notifyListeners();
       return false;
     }

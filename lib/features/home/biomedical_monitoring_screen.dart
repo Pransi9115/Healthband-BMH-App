@@ -365,7 +365,10 @@ class _TrendGroup extends StatelessWidget {
     final flaggedCount = markers
         .where((m) => m.isConcern || m.status == MarkerStatus.borderline)
         .length;
-    final tone = flaggedCount > 0 ? BMHColors.sMetabolic : BMHColors.sGut;
+    // Group heading tone follows the same range scale as the dots, so
+    // "2 to watch" is the amber of a borderline result, not a fourth
+    // unrelated colour.
+    final tone = flaggedCount > 0 ? BMHColors.rangeEdge : BMHColors.rangeIn;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),

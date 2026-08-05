@@ -11,8 +11,7 @@ import '../body/ble/device_management_screen.dart';
 import '../health/health_screen.dart';
 import '../settings/settings_screen.dart';
 import 'main_shell.dart';
-import 'daily_checkin_screen.dart';
-import '../glp1/glp1_home_card.dart';
+import 'daily_checkin_section.dart';
 import 'biomedical_monitoring_screen.dart';
 import '../diet/diet_screen.dart';
 import '../bioresponse/bioresponse_screen.dart';
@@ -148,23 +147,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     // shown here too as the Home screen's focal point.
                     Center(child: _BioScoreHero(ble: _ble)),
                     const SizedBox(height: 28),
-                    // ── CHECK-IN CARD ─────────────────────
-                    BMHCheckInCard(
-                      completed: _checkInDoneToday,
-                      onTap: () async {
-                        if (_checkInDoneToday) return; // already done today
-                        await Navigator.push(context,
-                          MaterialPageRoute(
-                            builder: (_) => const DailyCheckInScreen()));
-                        // Reload state after returning
-                        _checkTodaysCheckIn();
-                      }),
-                    const SizedBox(height: 14),
-                    // ── GLP-1 CHECK-IN ────────────────────
-                    // Separate from the wellness check-in above:
-                    // different questions, different cadence, and a
-                    // safety screen that must be answered daily.
-                    const Glp1HomeCard(),
+                    // ── DAILY CHECK-IN ────────────────────
+                    // Both questionnaires in one section: Mental Mood
+                    // first, then GLP-1. They used to be two stacked
+                    // full-width cards, which pushed everything else
+                    // below the fold.
+                    DailyCheckInSection(
+                      moodDone: _checkInDoneToday,
+                      onChanged: _checkTodaysCheckIn),
                     const SizedBox(height: 40),
                     // ── TODAY'S OVERVIEW ──────────────────
                     BMHSectionTitle(
