@@ -6,10 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../core/health/bioscore_calculator.dart';
-import '../body/ble/ble_intro_screen.dart';
 import '../body/ble/device_management_screen.dart';
 import '../health/health_screen.dart';
 import '../settings/settings_screen.dart';
+import '../body/body_track_screen.dart';
 import 'main_shell.dart';
 import 'daily_checkin_screen.dart';
 import 'daily_checkin_section.dart';
@@ -98,10 +98,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onBluetooth() {
+    // Always the device list, connected or not. This used to jump
+    // straight into band pairing whenever no band was connected,
+    // which made the BioScale unreachable: the only screen offering
+    // it was the one you could not get to without a band.
     Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _ble.isBandConnected
-          ? const DeviceManagementScreen()
-          : const BleIntroScreen(isScale: false)));
+      builder: (_) => const DeviceManagementScreen()));
   }
 
   void _onSettings() {
@@ -267,7 +269,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       subtitle: 'BioScale · Composition',
                       signalColor: BMHColors.sBody,
                       icon: const Icon(Icons.accessibility_new_outlined),
-                      expandedContent: _BodyModulePreview()),
+                      // No onTap here: BMHModuleCard fires onTap *and*
+                      // expands on the same gesture, so a card with
+                      // both navigates away while opening underneath.
+                      // The Open / Connect button inside the preview
+                      // is the way in.
+                      expandedContent: const _BodyModulePreview()),
                     BMHModuleCard(
                       title: 'Bio Care Team',
                       subtitle: 'Doctors · Coaches · Consults',
@@ -749,38 +756,70 @@ class _HealthModulePreview extends StatelessWidget {
 }
 
 class _BodyModulePreview extends StatelessWidget {
+  const _BodyModulePreview();
+
   @override
   Widget build(BuildContext context) {
+    final ble = BleService.instance;
+    final connected = ble.isScaleConnected;
+
     return Column(children: [
       const Divider(height: 20),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: BMHColors.bg4,
-          borderRadius: BorderRadius.circular(BMHRadius.md)),
-        child: Row(children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: BMHColors.sBody.withOpacity(0.10),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: BMHColors.sBody.withOpacity(0.2))),
-            child: Icon(Icons.monitor_weight_outlined,
-              color: BMHColors.sBody.withOpacity(0.5), size: 20)),
-          const SizedBox(width: 14),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('BioScale not connected',
-                style: BMHText.bodyMd.copyWith(
-                  color: BMHColors.inkMute)),
-              const SizedBox(height: 3),
-              Text('Connect your BioScale to see body composition data',
-                style: BMHText.monoSm.copyWith(
-                  fontSize: 9, color: BMHColors.inkDim)),
-            ])),
-        ])),
+      // Was a flat line of text with nothing to tap — it told you to
+      // connect a BioScale and gave you no way to do it.
+      GestureDetector(
+        onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => connected
+            ? const BodyTrackScreen()
+            : const DeviceManagementScreen())),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: BMHColors.bg4,
+            borderRadius: BorderRadius.circular(BMHRadius.md),
+            border: Border.all(
+              color: connected
+                ? BMHColors.sBody.withOpacity(0.3)
+                : Colors.transparent)),
+          child: Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: BMHColors.sBody.withOpacity(connected ? 0.16 : 0.10),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: BMHColors.sBody.withOpacity(
+                    connected ? 0.35 : 0.2))),
+              child: Icon(Icons.monitor_weight_outlined,
+                color: BMHColors.sBody.withOpacity(connected ? 1 : 0.5),
+                size: 20)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(connected ? 'BioScale connected' : 'BioScale not connected',
+                  style: BMHText.bodyMd.copyWith(
+                    color: connected ? BMHColors.ink : BMHColors.inkMute)),
+                const SizedBox(height: 3),
+                Text(connected
+                    ? 'Open your body composition report'
+                    : 'Tap to pair your BioScale',
+                  style: BMHText.monoSm.copyWith(
+                    fontSize: 9, color: BMHColors.inkDim)),
+              ])),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: BMHColors.sBody.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(BMHRadius.full),
+                border: Border.all(
+                  color: BMHColors.sBody.withOpacity(0.4))),
+              child: Text(connected ? 'Open' : 'Connect',
+                style: BMHText.labelMd.copyWith(
+                  fontSize: 11, color: BMHColors.sBody))),
+          ]))),
     ]);
   }
 }

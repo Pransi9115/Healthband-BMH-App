@@ -214,9 +214,9 @@ class _BodyScreenState extends State<_BodyScreen>
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => _ble.isBandConnected
-                            ? const DeviceManagementScreen()
-                            : const BleIntroScreen(isScale: false),
+                        // Device list either way — see _onBluetooth
+                        // in home_screen for why.
+                        builder: (_) => const DeviceManagementScreen(),
                       ),
                     ),
                   ),

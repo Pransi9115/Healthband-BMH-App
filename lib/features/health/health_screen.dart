@@ -11,6 +11,9 @@ import '../../core/health/vital_status.dart';
 import '../../core/health/sleep_analyzer.dart';
 import 'sleep_calibration_screen.dart';
 import 'live_health_screen.dart';
+import '../body/ble/device_management_screen.dart';
+import '../body/ble/ble_intro_screen.dart';
+import '../body/body_track_screen.dart';
 import '../../shared/widgets/capsule_wave_measurement.dart';
 
 // ─────────────────────────────────────────────────────────
@@ -485,6 +488,16 @@ class _HealthScreenState extends State<HealthScreen>
 
                 // BIOSCORE
                 _BioScoreCard(ble: _ble),
+                const SizedBox(height: 22),
+
+                // DEVICES
+                // Sits here rather than behind the Bluetooth icon
+                // because this is the screen people open when they
+                // want to know why there is no data — and the answer
+                // is almost always that nothing is paired yet.
+                BMHSectionTitle('Your devices'),
+                const SizedBox(height: 14),
+                _DeviceStrip(ble: _ble),
                 const SizedBox(height: 22),
 
                 // VITALS
@@ -2641,4 +2654,129 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
       ]),
     );
   }
+}
+
+
+// ─────────────────────────────────────────────────────────
+//  DEVICE STRIP — Bio Band tab
+//
+//  Both devices, their real connection state, and a way to act on
+//  each. The BioScale used to be reachable only from a screen you
+//  could not open without a band already connected, which is exactly
+//  backwards: the person with nothing paired is the one who needs it.
+// ─────────────────────────────────────────────────────────
+class _DeviceStrip extends StatelessWidget {
+  final BleService ble;
+  const _DeviceStrip({required this.ble});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      _DeviceTile(
+        title: 'Health Band',
+        subtitle: ble.isBandConnected
+          ? 'Connected · battery ${ble.battery}%'
+          : 'Heart rate, SpO2, sleep, steps',
+        icon: Icons.watch_outlined,
+        color: BMHColors.sCardio,
+        connected: ble.isBandConnected,
+        action: ble.isBandConnected ? 'Manage' : 'Connect',
+        onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => ble.isBandConnected
+            ? const DeviceManagementScreen()
+            : const BleIntroScreen(isScale: false)))),
+      const SizedBox(height: 10),
+      _DeviceTile(
+        title: 'BioScale',
+        subtitle: ble.isScaleConnected
+          ? 'Connected · open your composition report'
+          : 'Weight and body composition',
+        icon: Icons.monitor_weight_outlined,
+        color: BMHColors.sBody,
+        connected: ble.isScaleConnected,
+        action: ble.isScaleConnected ? 'Open' : 'Connect',
+        onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => ble.isScaleConnected
+            ? const BodyTrackScreen()
+            : const BleIntroScreen(isScale: true)))),
+    ]);
+  }
+}
+
+class _DeviceTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final bool connected;
+  final String action;
+  final VoidCallback onTap;
+
+  const _DeviceTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.connected,
+    required this.action,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    behavior: HitTestBehavior.opaque,
+    child: Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(
+          color: connected ? color.withOpacity(0.35) : BMHColors.line)),
+      child: Row(children: [
+        Container(
+          width: 42, height: 42,
+          decoration: BoxDecoration(
+            color: color.withOpacity(connected ? 0.16 : 0.09),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: color.withOpacity(connected ? 0.35 : 0.18))),
+          child: Icon(icon, size: 20,
+            color: color.withOpacity(connected ? 1 : 0.55))),
+        const SizedBox(width: 13),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Flexible(child: Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: BMHText.labelLg.copyWith(color: BMHColors.ink))),
+              const SizedBox(width: 7),
+              Container(
+                width: 6, height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: connected ? BMHColors.success : BMHColors.inkFaint)),
+            ]),
+            const SizedBox(height: 3),
+            Text(subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: BMHText.monoSm.copyWith(
+                fontSize: 9, color: BMHColors.inkDim)),
+          ])),
+        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          decoration: BoxDecoration(
+            color: connected ? color.withOpacity(0.14) : color,
+            borderRadius: BorderRadius.circular(BMHRadius.full),
+            border: Border.all(color: color.withOpacity(0.45))),
+          child: Text(action,
+            style: BMHText.labelMd.copyWith(
+              fontSize: 11,
+              color: connected ? color : BMHColors.bg0,
+              fontWeight: FontWeight.w600))),
+      ])));
 }
