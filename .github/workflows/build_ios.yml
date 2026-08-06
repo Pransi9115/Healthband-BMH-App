@@ -27,6 +27,9 @@ jobs:
 
       - name: Get dependencies (MUST run first!)
         run: flutter pub get
+        
+      - name: Register scale bridge with Xcode target
+        run: ruby ios/add_qn_files.rb
 
       - name: Install pods (after flutter pub get)
         run: |
