@@ -57,15 +57,18 @@ class BMHColors {
   static const Color danger  = Color(0xFFFF4D4D);
 
   // ── REFERENCE RANGE SCALE ──────────────────────────────
-  // Lab results read left to right: too low, where you want to be,
-  // too high. Three distinct colours, because "below range" and
-  // "above range" are different clinical problems and painting both
-  // the same red tells the patient nothing about which way to move.
-  static const Color rangeLow  = Color(0xFFFF8A00); // below reference
+  // A traffic light, read by distance from the range rather than by
+  // direction: green inside, amber just outside on either side, red
+  // further out on either side. Whether a result is high or low is
+  // said in words on the label; the colour answers the simpler and
+  // more urgent question of how far off it is.
   static const Color rangeIn   = Color(0xFF22C55E); // inside reference
-  static const Color rangeHigh = Color(0xFFF01B1B); // above reference
-  // Sitting just inside an edge — not yet out, worth watching.
-  static const Color rangeEdge = Color(0xFFFFC400);
+  static const Color rangeEdge = Color(0xFFFF9500); // borderline, either side
+  static const Color rangeOut  = Color(0xFFF01B1B); // outside, either side
+
+  // Kept as aliases so existing call sites keep reading naturally.
+  static const Color rangeLow  = rangeOut;
+  static const Color rangeHigh = rangeOut;
 
   // Helper — signal color with 0.08 alpha (metric card bg)
   static Color signalBg(Color signal) => signal.withOpacity(0.08);

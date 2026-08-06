@@ -64,10 +64,15 @@ String fmtDate(DateTime d) {
 /// out-of-range result is. The favourable nuance for markers where a
 /// high value is welcome moves into the detail text.
 String reportLabel(BloodMarker m) {
+  if (m.status == MarkerStatus.borderline) {
+    // Colour says "just outside"; the word says which side.
+    return m.value <= (m.refLow + m.refHigh) / 2
+      ? 'Borderline low' : 'Borderline high';
+  }
   return switch (m.status) {
     MarkerStatus.low => 'LOW',
     MarkerStatus.high => 'HIGH',
-    MarkerStatus.borderline => 'Keep an eye on',
+    MarkerStatus.borderline => 'Borderline',
     MarkerStatus.inRange => 'In range',
   };
 }
@@ -518,56 +523,49 @@ class ReferenceBar extends StatelessWidget {
       final zs = marker.zoneStart, ze = marker.zoneEnd;
       final pos = marker.barPosition;
 
-      // Three zones, left to right: below range, inside range, above
-      // range. Reading the bar should tell you which direction you are
-      // off in without reading the number.
-      final lowW = (zs * w).clamp(0.0, w);
-      final inW = ((ze - zs) * w).clamp(2.0, w);
-      final highW = ((1 - ze) * w).clamp(0.0, w);
+      // Five zones: red, amber, green, amber, red. The amber
+      // shoulders sit just inside each edge and match the borderline
+      // status, so the strip and the label always agree.
+      final span = ze - zs;
+      final edge = span * 0.12;
+      final aLo = (zs + edge).clamp(0.0, 1.0);
+      final aHi = (ze - edge).clamp(0.0, 1.0);
+
+      Widget zone(double from, double to, Color c,
+          {bool roundLeft = false, bool roundRight = false}) {
+        final left = (from * w).clamp(0.0, w);
+        final width = ((to - from) * w).clamp(0.0, w);
+        if (width <= 0) return const SizedBox.shrink();
+        return Positioned(
+          left: left, width: width, top: 7,
+          child: Container(
+            height: 7,
+            decoration: BoxDecoration(
+              color: c,
+              borderRadius: BorderRadius.horizontal(
+                left: Radius.circular(roundLeft ? BMHRadius.full : 0),
+                right: Radius.circular(roundRight ? BMHRadius.full : 0)))));
+      }
 
       return SizedBox(height: 20, child: Stack(children: [
-        // below range — orange
+        zone(0, zs, BMHColors.rangeOut, roundLeft: true),
+        zone(zs, aLo, BMHColors.rangeEdge),
+        zone(aLo, aHi, BMHColors.rangeIn),
+        zone(aHi, ze, BMHColors.rangeEdge),
+        zone(ze, 1, BMHColors.rangeOut, roundRight: true),
+
+        // The needle is white, as in the printed report. A coloured
+        // needle on a coloured strip fights with the zone underneath
+        // it; white reads cleanly against all three.
         Positioned(
-          left: 0, width: lowW, top: 7,
+          left: (pos * w - 2.5).clamp(0.0, w - 5), top: 4,
           child: Container(
-            height: 7,
-            decoration: const BoxDecoration(
-              color: BMHColors.rangeLow,
-              borderRadius: BorderRadius.horizontal(
-                left: Radius.circular(BMHRadius.full))))),
-        // inside range — green
-        Positioned(
-          left: zs * w, width: inW, top: 7,
-          child: Container(
-            height: 7,
-            color: BMHColors.rangeIn)),
-        // above range — red
-        Positioned(
-          left: ze * w, width: highW, top: 7,
-          child: Container(
-            height: 7,
-            decoration: const BoxDecoration(
-              color: BMHColors.rangeHigh,
-              borderRadius: BorderRadius.horizontal(
-                right: Radius.circular(BMHRadius.full))))),
-        // the needle at the actual result
-        Positioned(
-          left: (pos * w - 4).clamp(0.0, w - 8), top: 0,
-          child: Column(children: [
-            Container(
-              width: 8, height: 6,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(2),
-                border: Border.all(color: BMHColors.bg0, width: 0.5))),
-            Container(
-              width: 3, height: 15,
-              decoration: BoxDecoration(
-                color: color,
-                border: Border.symmetric(
-                  vertical: BorderSide(
-                    color: BMHColors.bg0.withOpacity(0.8), width: 0.5)))),
-          ])),
+            width: 5, height: 13,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(2.5),
+              border: Border.all(
+                color: BMHColors.bg0.withOpacity(0.55), width: 1)))),
       ]));
     });
   }
@@ -707,10 +705,9 @@ class ReportLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Wrap(
     spacing: 14, runSpacing: 6, children: [
-      _key(BMHColors.rangeLow, 'Below the range'),
-      _key(BMHColors.rangeIn, 'Where it should sit'),
-      _key(BMHColors.rangeEdge, 'Keep an eye on'),
-      _key(BMHColors.rangeHigh, 'Above the range'),
+      _key(BMHColors.rangeIn, 'Inside the range'),
+      _key(BMHColors.rangeEdge, 'Just outside, borderline'),
+      _key(BMHColors.rangeOut, 'Further outside the range'),
     ]);
 
   Widget _key(Color c, String label) => Row(

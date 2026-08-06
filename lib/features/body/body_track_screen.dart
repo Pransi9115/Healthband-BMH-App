@@ -1,16 +1,31 @@
+// ─────────────────────────────────────────────────────────
+//  BIO BODY TRACK
+//
+//  The full body composition report on one screen.
+//
+//  Every number comes from BodyCompositionService, which serves a
+//  demo fixture until the FG2001B-A feed is wired. That is stated at
+//  the top of the screen rather than hidden — showing invented
+//  numbers as though they were the patient's own is the one thing
+//  this screen must never do.
+//
+//  ORDER
+//  Score and weight first, because that is what people came for.
+//  Then the composition table, then what to change, then the
+//  breakdowns, and raw impedance last — it is the evidence behind
+//  everything above, and whoever wants it will scroll.
+// ─────────────────────────────────────────────────────────
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
-import '../../shared/widgets/bmh_screen.dart';
 import '../../shared/widgets/bmh_global_nav.dart';
-import '../../core/ble/ble_service.dart';
-import '../body/ble/ble_intro_screen.dart';
+import '../../core/body/body_composition.dart';
+import '../../core/body/body_composition_service.dart';
 
-// ─────────────────────────────────────────────
-//  BODY TRACK SCREEN
-//  BioScale weight + body composition
-// ─────────────────────────────────────────────
+const _accent = BMHColors.sBody;
 
 class BodyTrackScreen extends StatefulWidget {
   const BodyTrackScreen({super.key});
@@ -19,601 +34,803 @@ class BodyTrackScreen extends StatefulWidget {
   State<BodyTrackScreen> createState() => _BodyTrackScreenState();
 }
 
-class _BodyTrackScreenState extends State<BodyTrackScreen>
-    with SingleTickerProviderStateMixin {
-  final _ble = BleService.instance;
-  int _rangeIndex = 0;
-  late final AnimationController _scaleCtrl;
-
-  // Sample weight history data
-  final _weightHistory = [
-    [0.0, 76.2], [1.0, 75.8], [2.0, 75.5], [3.0, 75.9],
-    [4.0, 75.3], [5.0, 74.8], [6.0, 74.2],
-  ];
+class _BodyTrackScreenState extends State<BodyTrackScreen> {
+  final _svc = BodyCompositionService.instance;
 
   @override
   void initState() {
     super.initState();
-    _scaleCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1200),
-    )..forward();
-    _ble.addListener(_onBleChange);
+    _svc.addListener(_refresh);
+    _svc.init();
   }
 
-  void _onBleChange() { if (mounted) setState(() {}); }
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
-    _scaleCtrl.dispose();
-    _ble.removeListener(_onBleChange);
+    _svc.removeListener(_refresh);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Use real scale data if available, otherwise demo
-    final weight = 74.2;
-    final fatPct = 18.4;
-    final musclePct = 42.1;
-    final waterPct = 56.2;
-    final bmi = 22.8;
-    final visceralFat = 8;
-    final boneMass = 3.2;
+    final c = _svc.latest;
 
-    return BMHScreenBackground(
-      glowColor: BMHColors.sGut,
-      glowAlignment: Alignment.topLeft,
+    return Scaffold(
+      backgroundColor: BMHColors.bg0,
       bottomNavigationBar: const BMHGlobalNav(activeIndex: 0),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // ── TOP BAR ──────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: BMHSpacing.screenH, vertical: 8),
-              child: Row(children: [
-                BMHIconButton(
-                  onTap: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back_rounded,
-                    color: BMHColors.ink, size: 16),
-                ),
-                const SizedBox(width: 14),
-                Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    BMHEyebrow('Body composition', showDot: true),
-                    Text('Bio Body Track', style: BMHText.heading1),
-                  ],
-                )),
-                // Scale status
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: _ble.isScaleConnected
-                        ? BMHColors.sGut.withOpacity(0.12)
-                        : BMHColors.bg4,
-                    borderRadius: BorderRadius.circular(BMHRadius.full),
-                    border: Border.all(
-                      color: _ble.isScaleConnected
-                          ? BMHColors.sGut.withOpacity(0.3)
-                          : BMHColors.line),
-                  ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    BMHPulsingDot(
-                      color: _ble.isScaleConnected
-                          ? BMHColors.sGut
-                          : BMHColors.inkMute,
-                      size: 5,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      _ble.isScaleConnected ? 'Scale Live' : 'No Scale',
-                      style: BMHText.monoSm.copyWith(
-                        color: _ble.isScaleConnected
-                            ? BMHColors.sGut
-                            : BMHColors.inkMute,
-                        fontSize: 9,
-                      ),
-                    ),
-                  ]),
-                ),
+      body: Stack(children: [
+        Positioned(top: -160, right: -110,
+          child: Container(width: 420, height: 420,
+            decoration: BoxDecoration(shape: BoxShape.circle,
+              gradient: RadialGradient(colors: [
+                _accent.withOpacity(0.08), Colors.transparent])))),
+
+        SafeArea(bottom: false, child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: BMHSpacing.s5, vertical: 8),
+            child: Row(children: [
+              BMHIconButton(
+                onTap: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back_rounded,
+                  color: BMHColors.ink, size: 16)),
+              const SizedBox(width: 14),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const BMHEyebrow('BIOSCALE'),
+                  Text('Bio Body Track', style: BMHText.heading1),
+                ])),
+            ])),
+
+          Expanded(child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              BMHSpacing.s5, 4, BMHSpacing.s5, 40),
+            children: [
+              if (_svc.isDemo) _demoBanner(),
+              for (final w in c.warnings) _warningCard(w),
+
+              _hero(c),
+              const SizedBox(height: 22),
+
+              _section('Body composition'),
+              const SizedBox(height: 10),
+              for (final m in c.compositionTable) ...[
+                _MetricRow(metric: m),
+                const SizedBox(height: 8),
+              ],
+
+              const SizedBox(height: 14),
+              _section('What to change'),
+              const SizedBox(height: 10),
+              _controls(c),
+
+              const SizedBox(height: 22),
+              _section('Where you sit'),
+              const SizedBox(height: 10),
+              _assessment(c),
+
+              const SizedBox(height: 22),
+              _section('Body type'),
+              const SizedBox(height: 10),
+              _bodyType(c),
+
+              if (c.segmentMuscle.isNotEmpty) ...[
+                const SizedBox(height: 22),
+                _section('Muscle balance'),
+                const SizedBox(height: 6),
+                _hint('Each segment against what is expected for your '
+                      'height, age and sex. 100% is exactly expected.'),
+                const SizedBox(height: 10),
+                for (final s in c.segmentMuscle)
+                  _SegmentRow(reading: s, isMuscle: true),
+              ],
+
+              if (c.segmentFat.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _section('Segmental fat'),
+                const SizedBox(height: 6),
+                _hint('Inferred from whole-body impedance rather than '
+                      'measured limb by limb, so read it as a pattern '
+                      'rather than a precise figure.'),
+                const SizedBox(height: 10),
+                for (final s in c.segmentFat)
+                  _SegmentRow(reading: s, isMuscle: false),
+              ],
+
+              const SizedBox(height: 14),
+              _section('Other indicators'),
+              const SizedBox(height: 10),
+              _indicators(c),
+
+              if (_svc.trend.length > 1) ...[
+                const SizedBox(height: 22),
+                _section('Trend'),
+                const SizedBox(height: 10),
+                _trendChart(),
+              ],
+
+              if (c.impedance.isNotEmpty) ...[
+                const SizedBox(height: 22),
+                _section('Bioelectrical impedance'),
+                const SizedBox(height: 6),
+                _hint('The raw resistance the scale measured. Every '
+                      'estimate above is calculated from these numbers '
+                      'plus your height, age and sex.'),
+                const SizedBox(height: 10),
+                _impedance(c),
+              ],
+
+              const SizedBox(height: 20),
+              _footnote(),
+            ])),
+        ])),
+      ]));
+  }
+
+  // ── PIECES ──────────────────────────────────────────────
+  Widget _section(String s) => Text(s.toUpperCase(),
+    style: BMHText.monoSm.copyWith(
+      fontSize: 10, letterSpacing: 1.5, color: BMHColors.inkDim));
+
+  Widget _hint(String s) => Text(s,
+    style: BMHText.bodySm.copyWith(
+      fontSize: 10.5, color: BMHColors.inkMute, height: 1.45));
+
+  Widget _demoBanner() => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: BMHColors.warn.withOpacity(0.09),
+      borderRadius: BorderRadius.circular(BMHRadius.md),
+      border: Border.all(color: BMHColors.warn.withOpacity(0.35))),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Icon(Icons.science_outlined, color: BMHColors.warn, size: 15),
+      const SizedBox(width: 10),
+      Expanded(child: Text(
+        'Sample data. These are not your measurements — the BioScale '
+        'feed is not connected yet, so this is here to show the layout.',
+        style: BMHText.bodySm.copyWith(
+          fontSize: 11, color: BMHColors.ink2, height: 1.45))),
+    ]));
+
+  Widget _warningCard(BodyCompositionWarning w) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: BMHColors.rangeOut.withOpacity(0.09),
+      borderRadius: BorderRadius.circular(BMHRadius.md),
+      border: Border.all(color: BMHColors.rangeOut.withOpacity(0.35))),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Icon(Icons.error_outline_rounded,
+        color: BMHColors.rangeOut, size: 15),
+      const SizedBox(width: 10),
+      Expanded(child: Text(w.message,
+        style: BMHText.bodySm.copyWith(
+          fontSize: 11, color: BMHColors.ink2, height: 1.45))),
+    ]));
+
+  Widget _hero(BodyComposition c) {
+    final score = c.bodyScore;
+    final tone = score >= 80
+      ? BMHColors.rangeIn
+      : score >= 60 ? _accent : BMHColors.rangeEdge;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: [tone.withOpacity(0.12), tone.withOpacity(0.02)]),
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: tone.withOpacity(0.35))),
+      child: Column(children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const BMHEyebrow('Body score'),
+              const SizedBox(height: 6),
+              Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Text('$score',
+                  style: BMHText.displayMd.copyWith(
+                    fontSize: 44, color: tone, height: 1)),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 7, left: 4),
+                  child: Text('/100',
+                    style: BMHText.bodySm.copyWith(
+                      fontSize: 12, color: BMHColors.inkDim))),
               ]),
-            ),
+            ])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text('WEIGHT',
+              style: BMHText.monoSm.copyWith(
+                fontSize: 9, letterSpacing: 1, color: BMHColors.inkDim)),
+            const SizedBox(height: 4),
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(c.weightKg.toStringAsFixed(1),
+                style: BMHText.displayMd.copyWith(
+                  fontSize: 30, color: BMHColors.ink, height: 1)),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4, left: 3),
+                child: Text('kg',
+                  style: BMHText.bodySm.copyWith(
+                    fontSize: 11, color: BMHColors.inkDim))),
+            ]),
+            const SizedBox(height: 3),
+            Text('BMI ${c.bmi.toStringAsFixed(1)} · ${c.bmiBand}',
+              style: BMHText.monoSm.copyWith(
+                fontSize: 9, color: BMHColors.inkDim)),
+          ]),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: Text(
+            'Measured ${_fmtDateTime(c.measuredAt)} · ${c.source}',
+            style: BMHText.monoSm.copyWith(
+              fontSize: 9, color: BMHColors.inkMute))),
+        ]),
+      ]));
+  }
 
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: BMHSpacing.screenH),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
+  Widget _controls(BodyComposition c) {
+    Widget row(String label, double kg) {
+      final none = kg.abs() < 0.1;
+      final tone = none ? BMHColors.rangeIn : BMHColors.rangeEdge;
+      final text = none
+        ? 'On target'
+        : '${kg > 0 ? "+" : ""}${kg.toStringAsFixed(1)} kg';
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(children: [
+          Expanded(child: Text(label,
+            style: BMHText.bodySm.copyWith(
+              fontSize: 12.5, color: BMHColors.ink2))),
+          Text(text,
+            style: BMHText.labelMd.copyWith(fontSize: 13, color: tone)),
+        ]));
+    }
 
-                    // ── CONNECT SCALE BANNER ──────────────
-                    if (!_ble.isScaleConnected)
-                      GestureDetector(
-                        onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) =>
-                            const BleIntroScreen(isScale: true))),
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: BMHColors.sGut.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(BMHRadius.md),
-                            border: Border.all(
-                              color: BMHColors.sGut.withOpacity(0.25)),
-                          ),
-                          child: Row(children: [
-                            Icon(Icons.monitor_weight_outlined,
-                              color: BMHColors.sGut, size: 20),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Connect BioScale for live readings — showing demo data',
-                                style: BMHText.bodySm.copyWith(
-                                  color: BMHColors.inkDim)),
-                            ),
-                            Icon(Icons.chevron_right_rounded,
-                              color: BMHColors.sGut, size: 16),
-                          ]),
-                        ),
-                      ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: BMHColors.line)),
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Row(children: [
+            Expanded(child: Text('Suggested target weight',
+              style: BMHText.bodySm.copyWith(
+                fontSize: 12.5, color: BMHColors.ink2))),
+            Text('${c.targetWeightKg.toStringAsFixed(1)} kg',
+              style: BMHText.labelMd.copyWith(
+                fontSize: 13, color: BMHColors.ink)),
+          ])),
+        Divider(height: 1, color: BMHColors.line.withOpacity(0.6)),
+        row('Weight change', c.weightControlKg),
+        row('From fat', c.fatControlKg),
+        row('From muscle', c.muscleControlKg),
+        const SizedBox(height: 4),
+        Text(
+          'A range to steer by, not an instruction. Which direction fat '
+          'and muscle move over months matters far more than hitting '
+          'any particular number.',
+          style: BMHText.bodySm.copyWith(
+            fontSize: 10, color: BMHColors.inkMute, height: 1.45)),
+        const SizedBox(height: 8),
+      ]));
+  }
 
-                    // ── WEIGHT HERO CARD ──────────────────
-                    Container(
-                      padding: const EdgeInsets.all(22),
-                      decoration: BoxDecoration(
-                        color: BMHColors.bg3,
-                        borderRadius: BorderRadius.circular(BMHRadius.xl),
-                        border: Border.all(
-                          color: BMHColors.sGut.withOpacity(0.25)),
-                        boxShadow: BMHShadows.card,
-                      ),
-                      child: Stack(children: [
-                        Positioned(
-                          right: 0, top: 0, bottom: 0,
-                          child: const BMHScanLineFigure(
-                            width: 80, height: 120, opacity: 0.12),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(children: [
-                              BMHEyebrow('Current weight'),
-                              const Spacer(),
-                              BMHPill('↓ 2.0 kg this week',
-                                type: BMHPillType.success),
-                            ]),
-                            const SizedBox(height: 16),
-                            // Weight number
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  weight.toStringAsFixed(1),
-                                  style: BMHText.displayXl.copyWith(
-                                    fontSize: 68, height: 1,
-                                    color: BMHColors.ink,
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    bottom: 12, left: 6),
-                                  child: Text('kg',
-                                    style: BMHText.monoLg.copyWith(
-                                      color: BMHColors.inkMute,
-                                      fontSize: 18)),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            // BMI
-                            Row(children: [
-                              Text('BMI: ',
-                                style: BMHText.monoSm),
-                              Text(bmi.toStringAsFixed(1),
-                                style: BMHText.monoMd.copyWith(
-                                  color: BMHColors.sGut,
-                                  fontWeight: FontWeight.w600)),
-                              const SizedBox(width: 8),
-                              BMHPill('Healthy',
-                                type: BMHPillType.success),
-                            ]),
-                          ],
-                        ),
-                      ]),
-                    ),
+  Widget _assessment(BodyComposition c) => Container(
+    padding: const EdgeInsets.all(15),
+    decoration: BoxDecoration(
+      color: BMHColors.surface,
+      borderRadius: BorderRadius.circular(BMHRadius.lg),
+      border: Border.all(color: BMHColors.line)),
+    child: Column(children: [
+      _BandStrip(
+        label: 'BMI',
+        value: c.bmi.toStringAsFixed(1),
+        bands: const ['Thin', 'Standard', 'High', 'Too high'],
+        activeIndex: switch (c.bmiBand) {
+          'Thin' => 0, 'Standard' => 1, 'High' => 2, _ => 3 }),
+      const SizedBox(height: 14),
+      _BandStrip(
+        label: 'Body fat',
+        value: '${c.bodyFatPct.toStringAsFixed(1)}%',
+        bands: const ['Thin', 'Standard', 'High', 'Too high'],
+        activeIndex: switch (c.fatBand) {
+          'Thin' => 0, 'Standard' => 1, 'High' => 2, _ => 3 }),
+      const SizedBox(height: 14),
+      _BandStrip(
+        label: 'Weight against target',
+        value: '${c.weightVsTargetPct.round()}%',
+        bands: const ['Low', 'Normal', 'High'],
+        activeIndex: switch (c.weightVsTargetBand) {
+          'Low' => 0, 'Normal' => 1, _ => 2 }),
+    ]));
 
-                    const SizedBox(height: 16),
+  Widget _bodyType(BodyComposition c) {
+    final t = c.bodyType;
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: _accent.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: _accent.withOpacity(0.3))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(
+            color: _accent.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: _accent.withOpacity(0.35))),
+          child: const Icon(Icons.accessibility_new_rounded,
+            color: _accent, size: 20)),
+        const SizedBox(width: 13),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.label,
+              style: BMHText.heading2.copyWith(
+                fontSize: 18, color: BMHColors.ink)),
+            const SizedBox(height: 4),
+            Text(t.blurb,
+              style: BMHText.bodySm.copyWith(
+                fontSize: 11.5, color: BMHColors.inkDim, height: 1.45)),
+            const SizedBox(height: 8),
+            Text(
+              'From BMI ${c.bmi.toStringAsFixed(1)} against '
+              '${c.bodyFatPct.toStringAsFixed(1)}% body fat',
+              style: BMHText.monoSm.copyWith(
+                fontSize: 9, color: BMHColors.inkMute)),
+          ])),
+      ]));
+  }
 
-                    // ── BMI SCALE ─────────────────────────
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: BMHColors.surface,
-                        borderRadius: BorderRadius.circular(BMHRadius.lg),
-                        border: Border.all(color: BMHColors.line),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('BMI Scale'.toUpperCase(),
-                            style: BMHText.monoSm),
-                          const SizedBox(height: 12),
-                          // BMI bar
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: SizedBox(
-                              height: 12,
-                              child: Row(children: [
-                                Expanded(flex: 2,
-                                  child: Container(color: BMHColors.sOxygen)),
-                                Expanded(flex: 3,
-                                  child: Container(color: BMHColors.sGut)),
-                                Expanded(flex: 2,
-                                  child: Container(color: BMHColors.sMetabolic)),
-                                Expanded(flex: 3,
-                                  child: Container(color: BMHColors.danger)),
-                              ]),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Under\n<18.5',
-                                style: BMHText.monoSm.copyWith(
-                                  fontSize: 8, color: BMHColors.sOxygen),
-                                textAlign: TextAlign.center),
-                              Text('Normal\n18.5-25',
-                                style: BMHText.monoSm.copyWith(
-                                  fontSize: 8, color: BMHColors.sGut),
-                                textAlign: TextAlign.center),
-                              Text('Over\n25-30',
-                                style: BMHText.monoSm.copyWith(
-                                  fontSize: 8, color: BMHColors.sMetabolic),
-                                textAlign: TextAlign.center),
-                              Text('Obese\n>30',
-                                style: BMHText.monoSm.copyWith(
-                                  fontSize: 8, color: BMHColors.danger),
-                                textAlign: TextAlign.center),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text('Your BMI: $bmi — Healthy range ✓',
-                            style: BMHText.monoMd.copyWith(
-                              color: BMHColors.sGut)),
-                        ],
-                      ),
-                    ),
+  Widget _indicators(BodyComposition c) {
+    final items = <List<String>>[
+      ['Visceral fat grade', '${c.visceralGrade}',
+       c.visceralGrade <= 9 ? 'Within the healthy band' : 'Above the band'],
+      ['Basal metabolic rate', '${c.bmrKcal.round()} kcal',
+       'Energy used at complete rest'],
+      ['Fat free mass', '${c.fatFreeMassKg.toStringAsFixed(1)} kg',
+       'Everything that is not fat'],
+      ['Subcutaneous fat', '${c.subcutaneousPct.toStringAsFixed(1)}%',
+       'The fat sitting under the skin'],
+      ['Skeletal muscle index', c.smi.toStringAsFixed(1),
+       'Limb muscle scaled to height'],
+      ['Body age', '${c.bodyAge}',
+       'Composition compared with age ${c.age}'],
+      ['Waist to hip ratio', c.whr.toStringAsFixed(2),
+       'How fat is distributed'],
+    ];
 
-                    const SizedBox(height: 20),
+    return Container(
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: BMHColors.line)),
+      child: Column(children: [
+        for (var i = 0; i < items.length; i++) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 15, vertical: 11),
+            child: Row(children: [
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(items[i][0],
+                    style: BMHText.bodySm.copyWith(
+                      fontSize: 12.5, color: BMHColors.ink)),
+                  const SizedBox(height: 2),
+                  Text(items[i][2],
+                    style: BMHText.monoSm.copyWith(
+                      fontSize: 9, color: BMHColors.inkMute)),
+                ])),
+              Text(items[i][1],
+                style: BMHText.labelMd.copyWith(
+                  fontSize: 13, color: _accent)),
+            ])),
+          if (i < items.length - 1)
+            Divider(height: 1, color: BMHColors.line.withOpacity(0.5)),
+        ],
+      ]));
+  }
 
-                    // ── WEIGHT CHART ──────────────────────
-                    BMHSectionTitle(
-                      'Weight history',
-                      linkLabel: 'All data',
-                    ),
-                    const SizedBox(height: 16),
+  Widget _trendChart() {
+    final pts = _svc.trend;
+    final min = pts.map((p) => p.weightKg).reduce((a, b) => a < b ? a : b);
+    final max = pts.map((p) => p.weightKg).reduce((a, b) => a > b ? a : b);
+    final change = _svc.weightChange(days: 90);
 
-                    // Range toggle
-                    Container(
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: BMHColors.bg3,
-                        borderRadius: BorderRadius.circular(BMHRadius.md),
-                        border: Border.all(color: BMHColors.line),
-                      ),
-                      child: Row(
-                        children: ['Week', 'Month', '3 Months']
-                            .asMap().entries.map((e) {
-                          final active = e.key == _rangeIndex;
-                          return Expanded(
-                            child: GestureDetector(
-                              onTap: () =>
-                                  setState(() => _rangeIndex = e.key),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                margin: const EdgeInsets.all(3),
-                                decoration: BoxDecoration(
-                                  color: active
-                                      ? BMHColors.sGut
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Center(
-                                  child: Text(e.value,
-                                    style: BMHText.labelMd.copyWith(
-                                      color: active
-                                          ? BMHColors.bg0
-                                          : BMHColors.inkMute,
-                                      fontWeight: active
-                                          ? FontWeight.w600
-                                          : FontWeight.w400,
-                                    )),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: BMHColors.line)),
+      child: Column(children: [
+        if (change != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 12),
+            child: Row(children: [
+              Expanded(child: Text(
+                '${change > 0 ? "+" : ""}${change.toStringAsFixed(1)} kg '
+                'over the last 90 days',
+                style: BMHText.bodySm.copyWith(
+                  fontSize: 11.5, color: BMHColors.ink2))),
+            ])),
+        SizedBox(height: 138, child: LineChart(LineChartData(
+          minY: min - 1.5, maxY: max + 1.5,
+          gridData: FlGridData(
+            show: true, drawVerticalLine: false,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: BMHColors.line.withOpacity(0.5), strokeWidth: 1)),
+          titlesData: const FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
+          lineTouchData: const LineTouchData(enabled: false),
+          lineBarsData: [
+            LineChartBarData(
+              spots: [
+                for (var i = 0; i < pts.length; i++)
+                  FlSpot(i.toDouble(), pts[i].weightKg),
+              ],
+              isCurved: true,
+              curveSmoothness: 0.28,
+              color: _accent,
+              barWidth: 2.5,
+              dotData: FlDotData(
+                show: true,
+                getDotPainter: (s, p, b, i) => FlDotCirclePainter(
+                  radius: 3, color: _accent,
+                  strokeWidth: 2, strokeColor: BMHColors.bg0)),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    _accent.withOpacity(0.22),
+                    _accent.withOpacity(0.0)]))),
+          ]))),
+      ]));
+  }
 
-                    const SizedBox(height: 12),
+  Widget _impedance(BodyComposition c) {
+    Widget cell(String s, {bool head = false, bool first = false}) =>
+      Expanded(
+        flex: first ? 3 : 2,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+          child: Text(s,
+            textAlign: first ? TextAlign.left : TextAlign.right,
+            style: BMHText.monoSm.copyWith(
+              fontSize: head ? 8.5 : 10,
+              letterSpacing: head ? 0.8 : 0,
+              color: head ? BMHColors.inkDim : BMHColors.ink))));
 
-                    // Weight line chart
-                    Container(
-                      height: 180,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: BMHColors.bg3,
-                        borderRadius: BorderRadius.circular(BMHRadius.lg),
-                        border: Border.all(color: BMHColors.line),
-                      ),
-                      child: LineChart(LineChartData(
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          getDrawingHorizontalLine: (_) => FlLine(
-                            color: BMHColors.line,
-                            strokeWidth: 1,
-                            dashArray: [4, 4],
-                          ),
-                        ),
-                        titlesData: FlTitlesData(
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 36,
-                              getTitlesWidget: (v, _) => Text(
-                                v.toStringAsFixed(1),
-                                style: BMHText.monoSm.copyWith(fontSize: 8)),
-                            ),
-                          ),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              getTitlesWidget: (v, _) {
-                                final days = ['Mon', 'Tue', 'Wed', 'Thu',
-                                  'Fri', 'Sat', 'Sun'];
-                                final i = v.toInt();
-                                if (i >= 0 && i < days.length) {
-                                  return Text(days[i],
-                                    style: BMHText.monoSm.copyWith(
-                                      fontSize: 8));
-                                }
-                                return const SizedBox.shrink();
-                              },
-                            ),
-                          ),
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                        ),
-                        borderData: FlBorderData(show: false),
-                        minY: 73, maxY: 77,
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: _weightHistory
-                                .map((p) => FlSpot(p[0], p[1]))
-                                .toList(),
-                            isCurved: true,
-                            color: BMHColors.sGut,
-                            barWidth: 2.5,
-                            isStrokeCapRound: true,
-                            dotData: FlDotData(
-                              show: true,
-                              getDotPainter: (_, __, ___, ____) =>
-                                  FlDotCirclePainter(
-                                radius: 3,
-                                color: BMHColors.sGut,
-                                strokeWidth: 1.5,
-                                strokeColor: BMHColors.bg0,
-                              ),
-                            ),
-                            belowBarData: BarAreaData(
-                              show: true,
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  BMHColors.sGut.withOpacity(0.2),
-                                  BMHColors.sGut.withOpacity(0.0),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      )),
-                    ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: BMHColors.line)),
+      child: Column(children: [
+        Row(children: [
+          cell('SEGMENT', head: true, first: true),
+          cell('20 kHz', head: true),
+          cell('100 kHz', head: true),
+        ]),
+        Divider(height: 1, color: BMHColors.line.withOpacity(0.6)),
+        for (var i = 0; i < c.impedance.length; i++) ...[
+          Row(children: [
+            cell(c.impedance[i].segment.label, first: true),
+            cell('${c.impedance[i].ohms20kHz.toStringAsFixed(1)} Ω'),
+            cell('${c.impedance[i].ohms100kHz.toStringAsFixed(1)} Ω'),
+          ]),
+          if (i < c.impedance.length - 1)
+            Divider(height: 1, color: BMHColors.line.withOpacity(0.35)),
+        ],
+        const SizedBox(height: 4),
+      ]));
+  }
 
-                    const SizedBox(height: 26),
+  Widget _footnote() => Container(
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: BMHColors.bg2,
+      borderRadius: BorderRadius.circular(BMHRadius.md),
+      border: Border.all(color: BMHColors.line)),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Icon(Icons.info_outline_rounded,
+        color: BMHColors.inkDim, size: 14),
+      const SizedBox(width: 10),
+      Expanded(child: Text(
+        'A scale measures two things: your weight, and how easily a '
+        'small current passes through you. Everything else here is '
+        'estimated from those two, plus your height, age and sex. '
+        'Readings move with hydration, food and time of day, so weigh '
+        'yourself the same way each time and read the trend rather '
+        'than any single morning.',
+        style: BMHText.bodySm.copyWith(
+          fontSize: 10.5, color: BMHColors.inkMute, height: 1.5))),
+    ]));
 
-                    // ── BODY COMPOSITION ──────────────────
-                    BMHSectionTitle('Body composition'),
-                    const SizedBox(height: 16),
-
-                    // Composition grid
-                    GridView.count(
-                      padding: EdgeInsets.zero,
-                      crossAxisCount: 3,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 10,
-                      childAspectRatio: 0.9,
-                      children: [
-                        _CompoTile(
-                          label: 'Body Fat',
-                          value: '${fatPct}%',
-                          subtext: 'Normal',
-                          color: BMHColors.sNervous,
-                          icon: Icons.water_outlined,
-                          isOk: fatPct < 25,
-                        ),
-                        _CompoTile(
-                          label: 'Muscle',
-                          value: '${musclePct}%',
-                          subtext: 'Good',
-                          color: BMHColors.sGut,
-                          icon: Icons.fitness_center_rounded,
-                          isOk: true,
-                        ),
-                        _CompoTile(
-                          label: 'Water',
-                          value: '${waterPct}%',
-                          subtext: 'Normal',
-                          color: BMHColors.sOxygen,
-                          icon: Icons.water_drop_rounded,
-                          isOk: true,
-                        ),
-                        _CompoTile(
-                          label: 'Bone Mass',
-                          value: '${boneMass}kg',
-                          subtext: 'Normal',
-                          color: BMHColors.sDna,
-                          icon: Icons.accessibility_new_rounded,
-                          isOk: true,
-                        ),
-                        _CompoTile(
-                          label: 'Visceral',
-                          value: '$visceralFat',
-                          subtext: 'Healthy',
-                          color: BMHColors.sMetabolic,
-                          icon: Icons.favorite_outline_rounded,
-                          isOk: visceralFat < 10,
-                        ),
-                        _CompoTile(
-                          label: 'BMI',
-                          value: '$bmi',
-                          subtext: 'Healthy',
-                          color: BMHColors.cyan,
-                          icon: Icons.monitor_weight_outlined,
-                          isOk: bmi < 25,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // ── STEP ON SCALE CTA ─────────────────
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            BMHColors.sGut.withOpacity(0.12),
-                            BMHColors.sGut.withOpacity(0.04),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(BMHRadius.lg),
-                        border: Border.all(
-                          color: BMHColors.sGut.withOpacity(0.25)),
-                      ),
-                      child: Row(children: [
-                        Expanded(child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            BMHEyebrow('New measurement'),
-                            const SizedBox(height: 8),
-                            Text.rich(TextSpan(
-                              style: BMHText.heading2.copyWith(
-                                fontFamily: 'Fraunces'),
-                              children: const [
-                                TextSpan(text: 'Step on your '),
-                                TextSpan(text: 'BioScale',
-                                  style: TextStyle(
-                                    fontStyle: FontStyle.italic,
-                                    color: BMHColors.sGut)),
-                              ],
-                            )),
-                            const SizedBox(height: 4),
-                            Text('Auto-detects when you step on',
-                              style: BMHText.italic.copyWith(fontSize: 12)),
-                          ],
-                        )),
-                        Container(
-                          width: 48, height: 48,
-                          decoration: BoxDecoration(
-                            color: BMHColors.sGut,
-                            shape: BoxShape.circle,
-                            boxShadow: BMHShadows.glow(BMHColors.sGut),
-                          ),
-                          child: const Icon(
-                            Icons.monitor_weight_outlined,
-                            color: BMHColors.bg0, size: 22),
-                        ),
-                      ]),
-                    ),
-
-                    const SizedBox(height: 120),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  static String _fmtDateTime(DateTime d) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final m = d.minute.toString().padLeft(2, '0');
+    final ap = d.hour < 12 ? 'am' : 'pm';
+    return '${d.day} ${months[d.month - 1]}, $h:$m $ap';
   }
 }
 
-// ── COMPOSITION TILE ──────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+//  ONE COMPOSITION ROW
+// ─────────────────────────────────────────────────────────
+class _MetricRow extends StatelessWidget {
+  final BodyMetric metric;
+  const _MetricRow({required this.metric});
 
-class _CompoTile extends StatelessWidget {
-  final String label, value, subtext;
-  final Color color;
-  final IconData icon;
-  final bool isOk;
+  static Color toneFor(BandStatus s) => switch (s) {
+        BandStatus.low => BMHColors.rangeOut,
+        BandStatus.high => BMHColors.rangeOut,
+        BandStatus.standard => BMHColors.rangeIn,
+        BandStatus.excellent => BMHColors.sBody,
+      };
 
-  const _CompoTile({
-    required this.label, required this.value,
-    required this.subtext, required this.color,
-    required this.icon, required this.isOk,
+  @override
+  Widget build(BuildContext context) {
+    final tone = toneFor(metric.status);
+
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: BMHColors.line)),
+      child: Column(children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Flexible(child: Text(metric.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: BMHText.labelLg.copyWith(color: BMHColors.ink))),
+                if (metric.measured) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: BMHColors.bg4,
+                      borderRadius:
+                        BorderRadius.circular(BMHRadius.full)),
+                    child: Text('MEASURED',
+                      style: BMHText.monoSm.copyWith(
+                        fontSize: 7, letterSpacing: 0.6,
+                        color: BMHColors.inkDim))),
+                ],
+              ]),
+              const SizedBox(height: 3),
+              Text('Range ${metric.rangeLabel} ${metric.unit}',
+                style: BMHText.monoSm.copyWith(
+                  fontSize: 9, color: BMHColors.inkMute)),
+            ])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(metric.valueLabel,
+                style: BMHText.heading2.copyWith(
+                  fontSize: 19, color: tone)),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2, left: 3),
+                child: Text(metric.unit,
+                  style: BMHText.bodySm.copyWith(
+                    fontSize: 10, color: BMHColors.inkDim))),
+            ]),
+            const SizedBox(height: 2),
+            Text(metric.status.label.toUpperCase(),
+              style: BMHText.monoSm.copyWith(
+                fontSize: 8.5, letterSpacing: 0.9, color: tone,
+                fontWeight: FontWeight.w700)),
+          ]),
+        ]),
+
+        const SizedBox(height: 11),
+        _RangeBar(metric: metric),
+
+        if (metric.description.isNotEmpty) ...[
+          const SizedBox(height: 9),
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(child: Text(metric.description,
+              style: BMHText.bodySm.copyWith(
+                fontSize: 10.5, color: BMHColors.inkMute, height: 1.4))),
+            if (metric.percentOfWeight != null) ...[
+              const SizedBox(width: 10),
+              Text('${metric.percentOfWeight!.toStringAsFixed(1)}%',
+                style: BMHText.monoSm.copyWith(
+                  fontSize: 10, color: BMHColors.inkDim)),
+            ],
+          ]),
+        ],
+      ]));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  Below range is red. Above range is red too, unless more is
+//  better — muscle, protein, water, bone — where it is the body
+//  accent instead, because telling someone their muscle is
+//  dangerously high would be nonsense.
+// ─────────────────────────────────────────────────────────
+class _RangeBar extends StatelessWidget {
+  final BodyMetric metric;
+  const _RangeBar({required this.metric});
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (ctx, box) {
+      final w = box.maxWidth;
+      final zs = metric.zoneStart, ze = metric.zoneEnd;
+
+      Widget zone(double from, double to, Color c,
+          {bool l = false, bool r = false}) {
+        final left = (from * w).clamp(0.0, w);
+        final width = ((to - from) * w).clamp(0.0, w);
+        if (width <= 0) return const SizedBox.shrink();
+        return Positioned(
+          left: left, width: width, top: 6,
+          child: Container(
+            height: 6,
+            decoration: BoxDecoration(
+              color: c,
+              borderRadius: BorderRadius.horizontal(
+                left: Radius.circular(l ? BMHRadius.full : 0),
+                right: Radius.circular(r ? BMHRadius.full : 0)))));
+      }
+
+      return SizedBox(height: 18, child: Stack(children: [
+        zone(0, zs, BMHColors.rangeOut, l: true),
+        zone(zs, ze, BMHColors.rangeIn),
+        zone(ze, 1,
+          metric.highIsGood ? BMHColors.sBody : BMHColors.rangeOut,
+          r: true),
+        Positioned(
+          left: (metric.barPosition * w - 2.5).clamp(0.0, w - 5), top: 3,
+          child: Container(
+            width: 5, height: 12,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(2.5),
+              border: Border.all(
+                color: BMHColors.bg0.withOpacity(0.55), width: 1)))),
+      ]));
+    });
+}
+
+// ─────────────────────────────────────────────────────────
+class _SegmentRow extends StatelessWidget {
+  final SegmentReading reading;
+  final bool isMuscle;
+  const _SegmentRow({required this.reading, required this.isMuscle});
+
+  @override
+  Widget build(BuildContext context) {
+    final status = isMuscle ? reading.statusMuscle() : reading.statusFat();
+    final tone = _MetricRow.toneFor(status);
+    final pct = reading.percentOfExpected;
+
+    // 60% to 160% of expected across the bar.
+    final pos = ((pct - 60) / 100).clamp(0.0, 1.0);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+        decoration: BoxDecoration(
+          color: BMHColors.surface,
+          borderRadius: BorderRadius.circular(BMHRadius.md),
+          border: Border.all(color: BMHColors.line)),
+        child: Row(children: [
+          SizedBox(width: 58, child: Text(reading.segment.shortLabel,
+            style: BMHText.bodySm.copyWith(
+              fontSize: 12, color: BMHColors.ink2))),
+          Expanded(child: LayoutBuilder(builder: (ctx, box) {
+            final w = box.maxWidth;
+            return SizedBox(height: 14, child: Stack(children: [
+              Positioned(
+                left: 0, right: 0, top: 5,
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: BMHColors.bg4,
+                    borderRadius:
+                      BorderRadius.circular(BMHRadius.full)))),
+              Positioned(
+                left: 0, width: (pos * w).clamp(0.0, w), top: 5,
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: tone,
+                    borderRadius:
+                      BorderRadius.circular(BMHRadius.full)))),
+            ]));
+          })),
+          const SizedBox(width: 11),
+          SizedBox(width: 50, child: Text(
+            '${reading.massKg.toStringAsFixed(1)} kg',
+            textAlign: TextAlign.right,
+            style: BMHText.monoSm.copyWith(
+              fontSize: 10, color: BMHColors.ink))),
+          const SizedBox(width: 8),
+          SizedBox(width: 38, child: Text('${pct.round()}%',
+            textAlign: TextAlign.right,
+            style: BMHText.monoSm.copyWith(fontSize: 10, color: tone))),
+        ])));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+class _BandStrip extends StatelessWidget {
+  final String label;
+  final String value;
+  final List<String> bands;
+  final int activeIndex;
+
+  const _BandStrip({
+    required this.label,
+    required this.value,
+    required this.bands,
+    required this.activeIndex,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: BMHColors.surface,
-        borderRadius: BorderRadius.circular(BMHRadius.md),
-        border: Border.all(color: BMHColors.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            width: 30, height: 30,
+    // Middle band is where you want to be; the far end is red; a step
+    // off centre is amber.
+    final tone = activeIndex == 1
+      ? BMHColors.rangeIn
+      : activeIndex >= bands.length - 1
+        ? BMHColors.rangeOut
+        : BMHColors.rangeEdge;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(child: Text(label,
+          style: BMHText.bodySm.copyWith(
+            fontSize: 12, color: BMHColors.ink2))),
+        Text(value,
+          style: BMHText.labelMd.copyWith(fontSize: 13, color: tone)),
+      ]),
+      const SizedBox(height: 7),
+      Row(children: [
+        for (var i = 0; i < bands.length; i++) ...[
+          if (i > 0) const SizedBox(width: 4),
+          Expanded(child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 6),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: color.withOpacity(0.25)),
-            ),
-            child: Icon(icon, color: color, size: 15),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, style: BMHText.displaySm.copyWith(
-                fontSize: 18, color: color, height: 1)),
-              const SizedBox(height: 2),
-              Text(label, style: BMHText.monoSm.copyWith(fontSize: 8)),
-              Text(subtext, style: BMHText.monoSm.copyWith(
-                fontSize: 8,
-                color: isOk ? BMHColors.sGut : BMHColors.danger)),
-            ],
-          ),
+              color: i == activeIndex
+                ? tone.withOpacity(0.18) : BMHColors.bg3,
+              borderRadius: BorderRadius.circular(BMHRadius.sm),
+              border: Border.all(
+                color: i == activeIndex
+                  ? tone.withOpacity(0.5) : Colors.transparent)),
+            child: Text(bands[i],
+              textAlign: TextAlign.center,
+              style: BMHText.monoSm.copyWith(
+                fontSize: 8.5,
+                color: i == activeIndex ? tone : BMHColors.inkMute)))),
         ],
-      ),
-    );
+      ]),
+    ]);
   }
 }
