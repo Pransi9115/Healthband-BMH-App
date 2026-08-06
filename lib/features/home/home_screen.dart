@@ -10,6 +10,8 @@ import '../body/ble/device_management_screen.dart';
 import '../health/health_screen.dart';
 import '../settings/settings_screen.dart';
 import '../body/body_track_screen.dart';
+import '../body/ble/ble_intro_screen.dart';
+import '../../core/body/body_composition_service.dart';
 import 'main_shell.dart';
 import 'daily_checkin_screen.dart';
 import 'daily_checkin_section.dart';
@@ -39,6 +41,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _ble.addListener(_onBleUpdate);
     MedicationService.instance.addListener(_onBleUpdate);
     MedicationService.instance.init();
+    BodyCompositionService.instance.addListener(_onBleUpdate);
+    BodyCompositionService.instance.init();
+    _ble.loadScaleMemory();
     _loadProfileWeight();
     _loadUserName();
     _checkTodaysCheckIn();
@@ -761,17 +766,38 @@ class _BodyModulePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ble = BleService.instance;
-    final connected = ble.isScaleConnected;
+    final body = BodyCompositionService.instance;
+
+    // Deliberately NOT keyed off a live Bluetooth link. A scale wakes,
+    // sends its reading and drops within seconds, so "is it connected
+    // right now" is false almost all of the time and tells the patient
+    // nothing. What matters is whether there is a measurement.
+    final everPaired = ble.scaleEverPaired || ble.isScaleConnected;
+    final hasReading = !body.isDemo;
+
+    final title = hasReading
+      ? 'Last measured ${_ago(body.latest.measuredAt)}'
+      : everPaired
+        ? 'No measurement yet'
+        : 'BioScale not paired';
+
+    final sub = hasReading
+      ? '${body.latest.weightKg.toStringAsFixed(1)} kg · '
+        '${body.latest.bodyFatPct.toStringAsFixed(1)}% body fat'
+      : everPaired
+        ? 'Step on your BioScale with bare feet to take one'
+        : 'Pair your BioScale to track body composition';
+
+    final action = everPaired ? 'Open' : 'Pair';
+    final active = hasReading || everPaired;
 
     return Column(children: [
       const Divider(height: 20),
-      // Was a flat line of text with nothing to tap — it told you to
-      // connect a BioScale and gave you no way to do it.
       GestureDetector(
         onTap: () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => connected
+          builder: (_) => everPaired
             ? const BodyTrackScreen()
-            : const DeviceManagementScreen())),
+            : const BleIntroScreen(isScale: true))),
         behavior: HitTestBehavior.opaque,
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -779,48 +805,60 @@ class _BodyModulePreview extends StatelessWidget {
             color: BMHColors.bg4,
             borderRadius: BorderRadius.circular(BMHRadius.md),
             border: Border.all(
-              color: connected
-                ? BMHColors.sBody.withOpacity(0.3)
-                : Colors.transparent)),
+              color: active
+                ? BMHColors.sBody.withOpacity(0.3) : Colors.transparent)),
           child: Row(children: [
             Container(
               width: 40, height: 40,
               decoration: BoxDecoration(
-                color: BMHColors.sBody.withOpacity(connected ? 0.16 : 0.10),
+                color: BMHColors.sBody.withOpacity(active ? 0.16 : 0.10),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: BMHColors.sBody.withOpacity(
-                    connected ? 0.35 : 0.2))),
+                  color: BMHColors.sBody.withOpacity(active ? 0.35 : 0.2))),
               child: Icon(Icons.monitor_weight_outlined,
-                color: BMHColors.sBody.withOpacity(connected ? 1 : 0.5),
+                color: BMHColors.sBody.withOpacity(active ? 1 : 0.5),
                 size: 20)),
             const SizedBox(width: 14),
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(connected ? 'BioScale connected' : 'BioScale not connected',
+                Text(title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: BMHText.bodyMd.copyWith(
-                    color: connected ? BMHColors.ink : BMHColors.inkMute)),
+                    color: active ? BMHColors.ink : BMHColors.inkMute)),
                 const SizedBox(height: 3),
-                Text(connected
-                    ? 'Open your body composition report'
-                    : 'Tap to pair your BioScale',
+                Text(sub,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: BMHText.monoSm.copyWith(
                     fontSize: 9, color: BMHColors.inkDim)),
               ])),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 6),
+                horizontal: 13, vertical: 7),
               decoration: BoxDecoration(
-                color: BMHColors.sBody.withOpacity(0.14),
+                color: active
+                  ? BMHColors.sBody.withOpacity(0.14) : BMHColors.sBody,
                 borderRadius: BorderRadius.circular(BMHRadius.full),
                 border: Border.all(
-                  color: BMHColors.sBody.withOpacity(0.4))),
-              child: Text(connected ? 'Open' : 'Connect',
+                  color: BMHColors.sBody.withOpacity(0.45))),
+              child: Text(action,
                 style: BMHText.labelMd.copyWith(
-                  fontSize: 11, color: BMHColors.sBody))),
+                  fontSize: 11,
+                  color: active ? BMHColors.sBody : BMHColors.bg0,
+                  fontWeight: FontWeight.w600))),
           ]))),
     ]);
+  }
+
+  static String _ago(DateTime t) {
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 60) return '${d.inMinutes}m ago';
+    if (d.inHours < 24) return '${d.inHours}h ago';
+    if (d.inDays == 1) return 'yesterday';
+    return '${d.inDays}d ago';
   }
 }
 

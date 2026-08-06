@@ -2686,17 +2686,22 @@ class _DeviceStrip extends StatelessWidget {
             ? const DeviceManagementScreen()
             : const BleIntroScreen(isScale: false)))),
       const SizedBox(height: 10),
+      // Paired, not connected. A scale is only linked for the few
+      // seconds it takes to send a reading, so showing it as
+      // disconnected the rest of the time would be technically true
+      // and completely useless.
       _DeviceTile(
         title: 'BioScale',
-        subtitle: ble.isScaleConnected
-          ? 'Connected · open your composition report'
+        subtitle: ble.scaleEverPaired || ble.isScaleConnected
+          ? 'Step on it to take a measurement'
           : 'Weight and body composition',
         icon: Icons.monitor_weight_outlined,
         color: BMHColors.sBody,
-        connected: ble.isScaleConnected,
-        action: ble.isScaleConnected ? 'Open' : 'Connect',
+        connected: ble.scaleEverPaired || ble.isScaleConnected,
+        action: ble.scaleEverPaired || ble.isScaleConnected
+          ? 'Open' : 'Connect',
         onTap: () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => ble.isScaleConnected
+          builder: (_) => ble.scaleEverPaired || ble.isScaleConnected
             ? const BodyTrackScreen()
             : const BleIntroScreen(isScale: true)))),
     ]);

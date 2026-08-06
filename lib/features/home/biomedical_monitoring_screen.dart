@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../shared/theme/bmh_tokens.dart';
+import '../../core/bioresponse/dna_report_service.dart';
+import '../../core/bioresponse/gut_report_service.dart';
+import '../bioresponse/dna_report_screen.dart';
+import '../bioresponse/gut_report_screen.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_global_nav.dart';
 import '../../core/bioresponse/blood_report_service.dart';
@@ -31,6 +35,8 @@ class BiomedicalMonitoringScreen extends StatefulWidget {
 class _BiomedicalMonitoringScreenState
     extends State<BiomedicalMonitoringScreen> {
   final _blood = BloodReportService.instance;
+  final _dna = DnaReportService.instance;
+  final _gut = GutReportService.instance;
 
   String get type => widget.type;
 
@@ -107,6 +113,8 @@ class _BiomedicalMonitoringScreenState
   Widget build(BuildContext context) {
     final c = _cfg;
     final hasReport = type == 'Blood' && _blood.report != null;
+    final hasDna = type == 'DNA' && _dna.report != null;
+    final hasGut = type == 'GUT' && _gut.report != null;
 
     return Scaffold(
       backgroundColor: BMHColors.bg0,
@@ -150,6 +158,10 @@ class _BiomedicalMonitoringScreenState
                 if (hasReport)
                   // The actual panel, in the shared report format.
                   ..._bloodReport(context)
+                else if (hasDna)
+                  ..._dnaSummary(context)
+                else if (hasGut)
+                  ..._gutSummary(context)
                 else
                   // Explainer for GUT / DNA (and Blood before upload).
                   ..._explainer(c),
@@ -160,6 +172,100 @@ class _BiomedicalMonitoringScreenState
       ]),
     );
   }
+
+  // ── DNA — headline counts and a way into the full panel ──
+  List<Widget> _dnaSummary(BuildContext context) {
+    final r = _dna.report!;
+    return [
+      _ReportMast(
+        line1: r.patientName,
+        line2: '${r.panel} · ${r.traits.length} traits',
+        color: BMHColors.sDna),
+      const SizedBox(height: 16),
+      Row(children: [
+        Expanded(child: _countTile('${r.goodCount}', 'FAVOURABLE',
+          BMHColors.rangeIn)),
+        const SizedBox(width: 9),
+        Expanded(child: _countTile('${r.typicalCount}', 'TYPICAL',
+          BMHColors.rangeEdge)),
+        const SizedBox(width: 9),
+        Expanded(child: _countTile('${r.poorCount}', 'TO WORK ON',
+          BMHColors.rangeOut)),
+      ]),
+      const SizedBox(height: 18),
+      BloodReportOutlineButton(
+        label: 'VIEW FULL DNA REPORT',
+        onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => DnaReportScreen(report: r)))),
+      const SizedBox(height: 20),
+      Text(
+        'Your genes set a starting point, not a limit. Traits marked to '
+        'work on are the ones that need more deliberate training — not '
+        'ones that are closed to you.',
+        style: BMHText.bodySm.copyWith(
+          fontSize: 11.5, color: BMHColors.inkDim, height: 1.5)),
+    ];
+  }
+
+  // ── GUT — the IgG panel ─────────────────────────────────
+  List<Widget> _gutSummary(BuildContext context) {
+    final r = _gut.report!;
+    return [
+      _ReportMast(
+        line1: r.patientName,
+        line2: '${r.method} panel · ${r.testedAntigens} antigens',
+        color: BMHColors.sGut),
+      const SizedBox(height: 16),
+      Row(children: [
+        Expanded(child: _countTile('${r.lowCount}', 'LOW',
+          BMHColors.rangeIn)),
+        const SizedBox(width: 9),
+        Expanded(child: _countTile('${r.intermediateCount}',
+          'INTERMEDIATE', BMHColors.rangeEdge)),
+        const SizedBox(width: 9),
+        Expanded(child: _countTile('${r.highCount}', 'ELEVATED',
+          BMHColors.rangeOut)),
+      ]),
+      const SizedBox(height: 18),
+      BloodReportOutlineButton(
+        label: 'VIEW FULL GUT REPORT',
+        onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => GutReportScreen(report: r)))),
+      const SizedBox(height: 20),
+      // Said here as well as inside the report, because this is where
+      // someone might glance at three red dots and start cutting foods.
+      Text(
+        'IgG against a food rises with how often you eat it, so these '
+        'readings record exposure rather than harm. This is not an '
+        'allergy test — use the high readings as a shortlist to discuss '
+        'with your care team, not as a list to avoid.',
+        style: BMHText.bodySm.copyWith(
+          fontSize: 11.5, color: BMHColors.inkDim, height: 1.5)),
+    ];
+  }
+
+  Widget _countTile(String n, String label, Color c) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+    decoration: BoxDecoration(
+      color: BMHColors.surface,
+      borderRadius: BorderRadius.circular(BMHRadius.md),
+      border: Border(
+        top: BorderSide(color: c, width: 2.5),
+        left: BorderSide(color: BMHColors.line),
+        right: BorderSide(color: BMHColors.line),
+        bottom: BorderSide(color: BMHColors.line))),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(n,
+          style: BMHText.displayMd.copyWith(
+            fontSize: 26, color: c, height: 1)),
+        const SizedBox(height: 5),
+        Text(label,
+          maxLines: 2,
+          style: BMHText.monoSm.copyWith(
+            fontSize: 8, letterSpacing: 0.8, color: BMHColors.inkDim)),
+      ]));
 
   // ── BLOOD — the full report, same format as Biomarkers ──
   List<Widget> _bloodReport(BuildContext context) {
@@ -394,4 +500,49 @@ class _TrendGroup extends StatelessWidget {
           TrendDots(markers: markers, color: tone),
         ]));
   }
+}
+
+
+// ─────────────────────────────────────────────────────────
+//  SHARED MASTHEAD for the DNA and GUT panels
+// ─────────────────────────────────────────────────────────
+class _ReportMast extends StatelessWidget {
+  final String line1;
+  final String line2;
+  final Color color;
+
+  const _ReportMast({
+    required this.line1,
+    required this.line2,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(15),
+    decoration: BoxDecoration(
+      color: BMHColors.surface,
+      borderRadius: BorderRadius.circular(BMHRadius.lg),
+      border: Border.all(color: BMHColors.line)),
+    child: Row(children: [
+      Container(
+        width: 3, height: 34,
+        decoration: BoxDecoration(
+          color: color, borderRadius: BorderRadius.circular(2))),
+      const SizedBox(width: 13),
+      Expanded(child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(line1,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: BMHText.labelLg.copyWith(color: BMHColors.ink)),
+          const SizedBox(height: 3),
+          Text(line2,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: BMHText.monoSm.copyWith(
+              fontSize: 9, color: BMHColors.inkDim)),
+        ])),
+    ]));
 }
