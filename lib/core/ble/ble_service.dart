@@ -197,6 +197,21 @@ class BleService extends ChangeNotifier {
   BMHBleDevice? get connectedBand  => _connectedBand;
   BMHBleDevice? get connectedScale => _connectedScale;
 
+  /// Releases the scale from the generic Bluetooth stack.
+  ///
+  /// The Qingniu SDK needs exclusive access to the peripheral, and two
+  /// stacks holding the same device produces connection failures that
+  /// look random. Called before handing over.
+  Future<void> disconnectScale() async {
+    try {
+      await _scaleConnSub?.cancel();
+      _scaleConnSub = null;
+      await _connectedScale?.device.disconnect();
+    } catch (_) {/* not connected */}
+    _connectedScale = null;
+    notifyListeners();
+  }
+
   /// Has a scale ever been paired on this device?
   ///
   /// This is the question the UI should ask, not "is it connected
