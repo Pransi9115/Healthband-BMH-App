@@ -23,7 +23,7 @@ import UserNotifications
     // The scale bridge, registered alongside every other plugin so the
     // timing is never in question.
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "QnScalePlugin") {
-      QnScalePlugin.register(withMessenger: registrar.messenger())
+      QnScalePlugin.register(with: registrar.messenger())
     }
   }
 }
