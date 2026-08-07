@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../body/ble/scale_pairing_screen.dart';
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_global_nav.dart';
@@ -14,7 +13,6 @@ import 'sleep_calibration_screen.dart';
 import 'live_health_screen.dart';
 import '../body/ble/device_management_screen.dart';
 import '../body/ble/ble_intro_screen.dart';
-import '../body/body_track_screen.dart';
 import '../../shared/widgets/capsule_wave_measurement.dart';
 
 // ─────────────────────────────────────────────────────────
@@ -496,7 +494,7 @@ class _HealthScreenState extends State<HealthScreen>
                 // because this is the screen people open when they
                 // want to know why there is no data — and the answer
                 // is almost always that nothing is paired yet.
-                BMHSectionTitle('Your devices'),
+                BMHSectionTitle('Your band'),
                 const SizedBox(height: 14),
                 _DeviceStrip(ble: _ble),
                 const SizedBox(height: 22),
@@ -2686,25 +2684,9 @@ class _DeviceStrip extends StatelessWidget {
           builder: (_) => ble.isBandConnected
             ? const DeviceManagementScreen()
             : const BleIntroScreen(isScale: false)))),
-      const SizedBox(height: 10),
-      // Paired, not connected. A scale is only linked for the few
-      // seconds it takes to send a reading, so showing it as
-      // disconnected the rest of the time would be technically true
-      // and completely useless.
-      _DeviceTile(
-        title: 'BioScale',
-        subtitle: ble.scaleEverPaired || ble.isScaleConnected
-          ? 'Step on it to take a measurement'
-          : 'Weight and body composition',
-        icon: Icons.monitor_weight_outlined,
-        color: BMHColors.sBody,
-        connected: ble.scaleEverPaired || ble.isScaleConnected,
-        action: ble.scaleEverPaired || ble.isScaleConnected
-          ? 'Open' : 'Connect',
-        onTap: () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => ble.scaleEverPaired || ble.isScaleConnected
-            ? const BodyTrackScreen()
-            : const ScalePairingScreen()))),
+      // The BioScale tile used to sit here. It now lives only in
+      // Bio Body Track, reached from Home, so the scale is not
+      // presented twice in two different places.
     ]);
   }
 }

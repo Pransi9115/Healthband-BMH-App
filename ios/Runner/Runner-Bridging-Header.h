@@ -11,4 +11,3 @@
 // The scale bridge is Objective-C, so AppDelegate.swift reaches it
 // through here. QNSDK itself is imported inside QnScalePlugin.m and
 // does not need to appear in this file.
-#import "QnScalePlugin.h"

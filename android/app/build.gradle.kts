@@ -40,5 +40,4 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
-    implementation("com.github.YolandaQingniu:qnscalesdkX:2.28.1")
-}
+    }

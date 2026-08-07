@@ -5,16 +5,21 @@
 //  flow, and that separation is deliberate.
 //
 //  WHY THE OLD PATH COULD NEVER WORK
-//  flutter_blue_plus could find the scale and connect to it, but never
-//  read it — Qingniu's protocol is proprietary and only their SDK
-//  speaks it. Worse, the two stacks actively fought: once
-//  flutter_blue_plus connected, the scale stopped advertising, so the
-//  Qingniu SDK's own scan found nothing and sat waiting forever. The
-//  weight appeared on the scale's display and went nowhere.
+//  This screen used to drive Qingniu's native SDK, on the assumption
+//  that the FG2001B-A was a Yolanda scale. It is not. It is a Lefu
+//  OEM unit speaking the Fitdays FFB0 protocol, so Qingniu's SDK
+//  discarded it during scanning and reported nothing — no device, no
+//  error, forever. See lefu_scale_service.dart for the evidence.
 //
-//  So the scale now belongs entirely to the SDK: it scans, it
-//  connects, it reads. The Health Band keeps flutter_blue_plus
-//  untouched.
+//  The scale is now read directly over flutter_blue_plus, the same
+//  stack as the Health Band. No native plugin, no appId, no vendor
+//  configuration file.
+//
+//  WEIGHT IS MEASURED, COMPOSITION IS ESTIMATED
+//  Nobody outside Lefu has decoded the impedance frame, so body fat
+//  and the rest are computed from published equations rather than
+//  measured. Whatever this screen and Bio Body Track show must make
+//  that distinction visible — BodyComposition.source carries it.
 //
 //  A SCALE IS NOT A WATCH
 //  It wakes when stood on, advertises for a few seconds, transmits,
@@ -29,7 +34,7 @@ import 'package:flutter/material.dart';
 
 import '../../../shared/theme/bmh_tokens.dart';
 import '../../../shared/widgets/bmh_widgets.dart';
-import '../../../core/body/qn_scale_service.dart';
+import '../../../core/body/lefu_scale_service.dart';
 import '../body_track_screen.dart';
 
 const _accent = BMHColors.sGut;
@@ -42,7 +47,7 @@ class ScalePairingScreen extends StatefulWidget {
 }
 
 class _ScalePairingScreenState extends State<ScalePairingScreen> {
-  final _qn = QnScaleService.instance;
+  final _qn = LefuScaleService.instance;
 
   Timer? _scanTimeout;
   bool _scanExpired = false;
@@ -62,7 +67,7 @@ class _ScalePairingScreenState extends State<ScalePairingScreen> {
     // someone tap it when it is the only option wastes the few
     // seconds of advertising they have.
     if (!_autoConnected &&
-        _qn.state == QnState.scanning &&
+        _qn.state == ScaleState.scanning &&
         _qn.found.length == 1) {
       _autoConnected = true;
       _connect(_qn.found.first);
@@ -93,14 +98,14 @@ class _ScalePairingScreenState extends State<ScalePairingScreen> {
     _scanTimeout?.cancel();
     _scanTimeout = Timer(const Duration(seconds: 20), () {
       if (!mounted) return;
-      if (_qn.state == QnState.scanning) {
+      if (_qn.state == ScaleState.scanning) {
         _qn.stopScan();
         setState(() => _scanExpired = true);
       }
     });
   }
 
-  Future<void> _connect(QnDevice d) async {
+  Future<void> _connect(ScaleDevice d) async {
     _scanTimeout?.cancel();
     await _qn.stopScan();
     await _qn.connect(d.mac);
@@ -147,11 +152,11 @@ class _ScalePairingScreenState extends State<ScalePairingScreen> {
     if (!_qn.isAvailable) return _unavailable();
 
     switch (_qn.state) {
-      case QnState.done:      return _done();
-      case QnState.measuring: return _measuring();
-      case QnState.connected: return _standOn();
-      case QnState.connecting:return _connecting();
-      case QnState.error:     return _error();
+      case ScaleState.done:      return _done();
+      case ScaleState.measuring: return _measuring();
+      case ScaleState.connected: return _standOn();
+      case ScaleState.connecting:return _connecting();
+      case ScaleState.error:     return _error();
       default:
         if (_scanExpired) return _notFound();
         return _scanning();
@@ -395,7 +400,7 @@ class _ScalePairingScreenState extends State<ScalePairingScreen> {
           fontSize: 10, color: n > 0 ? _accent : BMHColors.inkDim)),
     ]));
 
-  Widget _deviceTile(QnDevice d) => Padding(
+  Widget _deviceTile(ScaleDevice d) => Padding(
     padding: const EdgeInsets.only(bottom: 9),
     child: GestureDetector(
       onTap: () => _connect(d),

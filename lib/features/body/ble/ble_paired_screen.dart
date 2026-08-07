@@ -5,7 +5,7 @@ import '../../../shared/widgets/bmh_widgets.dart';
 import '../../health/live_health_screen.dart';
 import '../../../shared/widgets/bmh_screen.dart';
 import '../../../shared/widgets/bmh_global_nav.dart';
-import '../../../core/body/qn_scale_service.dart';
+import '../../../core/body/lefu_scale_service.dart';
 import '../../body/body_track_screen.dart';
 
 class BlePairedScreen extends StatefulWidget {
@@ -45,7 +45,7 @@ class _BlePairedScreenState extends State<BlePairedScreen>
     }
   }
 
-  final _qn = QnScaleService.instance;
+  final _qn = LefuScaleService.instance;
 
   void _onQnChange() { if (mounted) setState(() {}); }
 
@@ -66,11 +66,11 @@ class _BlePairedScreenState extends State<BlePairedScreen>
     // Android reports a MAC, and the two stacks do not always agree.
     for (var i = 0; i < 40 && mounted; i++) {
       await Future.delayed(const Duration(milliseconds: 400));
-      if (_qn.state == QnState.connected ||
-          _qn.state == QnState.measuring ||
-          _qn.state == QnState.done) return;
+      if (_qn.state == ScaleState.connected ||
+          _qn.state == ScaleState.measuring ||
+          _qn.state == ScaleState.done) return;
 
-      QnDevice? match;
+      ScaleDevice? match;
       for (final d in _qn.found) {
         if (d.mac.toLowerCase() == widget.device.id.toLowerCase() ||
             (d.name.isNotEmpty &&
@@ -375,7 +375,7 @@ class _LiveTile extends StatelessWidget {
 
 class _ScaleLivePreview extends StatelessWidget {
   final Color color;
-  final QnScaleService qn;
+  final LefuScaleService qn;
   const _ScaleLivePreview({required this.color, required this.qn});
 
   @override
@@ -399,7 +399,7 @@ class _ScaleLivePreview extends StatelessWidget {
     }
 
     switch (qn.state) {
-      case QnState.done:
+      case ScaleState.done:
         final c = qn.last;
         return _shell(children: [
           const BMHEyebrow('Measurement complete', showDot: true),
@@ -442,7 +442,7 @@ class _ScaleLivePreview extends StatelessWidget {
                   fontWeight: FontWeight.w600)))),
         ]);
 
-      case QnState.measuring:
+      case ScaleState.measuring:
         return _shell(children: [
           const BMHEyebrow('Reading', showDot: true),
           const SizedBox(height: 16),
@@ -465,7 +465,7 @@ class _ScaleLivePreview extends StatelessWidget {
             style: BMHText.italic, textAlign: TextAlign.center),
         ]);
 
-      case QnState.error:
+      case ScaleState.error:
         return _shell(children: [
           const BMHEyebrow('Could not read the scale', showDot: false),
           const SizedBox(height: 14),
@@ -479,8 +479,8 @@ class _ScaleLivePreview extends StatelessWidget {
         ]);
 
       default:
-        final connecting = qn.state == QnState.connecting ||
-                           qn.state == QnState.scanning;
+        final connecting = qn.state == ScaleState.connecting ||
+                           qn.state == ScaleState.scanning;
         return _shell(children: [
           BMHEyebrow(
             connecting ? 'Preparing your scale' : 'Step on scale to measure',
