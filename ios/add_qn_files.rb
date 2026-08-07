@@ -28,6 +28,10 @@ RUNNER_DIR   = File.join(__dir__, 'Runner')
 SOURCES   = ['QnScalePlugin.swift']
 RESOURCES = ['123456789.qn']
 
+# The bridging header is not compiled or bundled — it is named in a
+# build setting instead. Set here so a fresh clone does not need Xcode.
+BRIDGING_HEADER = 'Runner/Runner-Bridging-Header.h'
+
 unless File.exist?(PROJECT_PATH)
   abort "Could not find #{PROJECT_PATH}"
 end
@@ -76,6 +80,20 @@ RESOURCES.each do |name|
   target.resources_build_phase.add_file_reference(ref)
   puts "ADD   #{name} to Copy Bundle Resources"
   changed = true
+end
+
+# Point the target at the bridging header. Flutter's template usually
+# sets this already, but a project that never had Swift will not have
+# it, and without it the QNSDK import is invisible to Swift.
+target.build_configurations.each do |config|
+  current = config.build_settings['SWIFT_OBJC_BRIDGING_HEADER']
+  if current.nil? || current.to_s.empty?
+    config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = BRIDGING_HEADER
+    puts "SET   bridging header for #{config.name}"
+    changed = true
+  else
+    puts "OK    bridging header already set for #{config.name}: #{current}"
+  end
 end
 
 if changed

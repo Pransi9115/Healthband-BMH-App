@@ -1,6 +1,5 @@
 import Flutter
 import UIKit
-import QNSDK
 
 // ─────────────────────────────────────────────────────────
 //  QINGNIU SCALE BRIDGE — iOS
@@ -8,10 +7,16 @@ import QNSDK
 //  Copy to: ios/Runner/QnScalePlugin.swift
 //  Add to the Runner target in Xcode.
 //
-//  `import QNSDK` works because the Podfile uses use_frameworks! and
-//  the pod declares static_framework, so CocoaPods builds it as a
-//  module. Without use_frameworks! this would instead need a bridging
-//  header line: #import "QNBleApi.h"
+//  NO `import QNSDK` HERE.
+//  Flutter now integrates plugins through Swift Package Manager, and
+//  under SPM the CocoaPods module for QNSDK does not resolve as a
+//  Swift module — the compiler reports "Unable to resolve module
+//  dependency". The SDK is Objective-C anyway, so it is reached
+//  through the bridging header instead, which works under both
+//  integration styles.
+//
+//  ios/Runner/Runner-Bridging-Header.h must contain:
+//      #import <QNSDK/QNBleApi.h>
 //
 //  Mirrors the Kotlin bridge exactly: same channel names, same event
 //  shapes, so the Dart side does not care which platform it is on.
