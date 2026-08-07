@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../body/ble/scale_pairing_screen.dart';
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_global_nav.dart';
@@ -2703,7 +2704,7 @@ class _DeviceStrip extends StatelessWidget {
         onTap: () => Navigator.push(context, MaterialPageRoute(
           builder: (_) => ble.scaleEverPaired || ble.isScaleConnected
             ? const BodyTrackScreen()
-            : const BleIntroScreen(isScale: true)))),
+            : const ScalePairingScreen()))),
     ]);
   }
 }

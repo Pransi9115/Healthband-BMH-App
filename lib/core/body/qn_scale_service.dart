@@ -330,6 +330,12 @@ class QnScaleService extends ChangeNotifier {
       _state = QnState.done;
       notifyListeners();
 
+      // Remembered so Home and the Bio Band tab can show the scale as
+      // paired. A scale is connected for seconds at a time, so live
+      // connection state is the wrong thing for the UI to ask about.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('bmh_scale_name', 'BioScale');
+
       // Straight into the store the report reads from.
       await BodyCompositionService.instance.ingest(c);
     } catch (e) {

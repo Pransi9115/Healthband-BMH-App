@@ -1,3 +1,4 @@
+import '../body/ble/scale_pairing_screen.dart';
 import '../../core/ble/ble_service.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -797,7 +798,7 @@ class _BodyModulePreview extends StatelessWidget {
         onTap: () => Navigator.push(context, MaterialPageRoute(
           builder: (_) => everPaired
             ? const BodyTrackScreen()
-            : const BleIntroScreen(isScale: true))),
+            : const ScalePairingScreen())),
         behavior: HitTestBehavior.opaque,
         child: Container(
           padding: const EdgeInsets.all(16),
