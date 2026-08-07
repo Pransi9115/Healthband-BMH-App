@@ -235,6 +235,9 @@ class QnScaleService extends ChangeNotifier {
         _state = switch (s) {
           'connecting' => QnState.connecting,
           'connected' => QnState.connected,
+          // The scale has weight and is now running the impedance
+          // measurement. This is the step that needs bare feet.
+          'measuring' => QnState.measuring,
           'disconnected' => QnState.idle,
           _ => _state,
         };

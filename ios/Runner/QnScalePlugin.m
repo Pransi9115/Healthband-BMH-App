@@ -12,7 +12,7 @@
 //
 
 #import "QnScalePlugin.h"
-#import <QNSDK/QNBleApi.h>
+#import <QNSDK/QNDeviceSDK.h>
 
 @interface QnScalePlugin () <FlutterStreamHandler,
                              QNBleDeviceDiscoveryListener,
@@ -124,7 +124,10 @@ static QnScalePlugin *sharedPlugin = nil;
 }
 
 - (void)startScan:(FlutterResult)result {
-    [[QNBleApi sharedBleApi] setBleDeviceDiscoveryListener:self];
+    // Assigned as a property. The documentation describes
+    // setBleDeviceDiscoveryListener:, which is the Android API — the
+    // iOS SDK exposes these as weak properties instead.
+    [QNBleApi sharedBleApi].discoveryListener = self;
     [[QNBleApi sharedBleApi] startBleDeviceDiscovery:^(NSError *error) {
         if (error) {
             [self sendError:[NSString stringWithFormat:
@@ -135,7 +138,9 @@ static QnScalePlugin *sharedPlugin = nil;
 }
 
 - (void)stopScan:(FlutterResult)result {
-    [[QNBleApi sharedBleApi] stopBleDeviceDiscovery:^(NSError *error) {}];
+    // "Discorvery" is spelled that way in the SDK header. Not a typo
+    // here — correcting it does not compile.
+    [[QNBleApi sharedBleApi] stopBleDeviceDiscorvery:^(NSError *error) {}];
     result(@(YES));
 }
 
@@ -174,8 +179,8 @@ static QnScalePlugin *sharedPlugin = nil;
         }
     }];
 
-    [[QNBleApi sharedBleApi] setBleConnectionChangeListener:self];
-    [[QNBleApi sharedBleApi] setBleDeviceDataListener:self];
+    [QNBleApi sharedBleApi].connectionChangeListener = self;
+    [QNBleApi sharedBleApi].dataListener = self;
 
     [[QNBleApi sharedBleApi] connectDevice:device
                                       user:self.user
@@ -206,17 +211,13 @@ static QnScalePlugin *sharedPlugin = nil;
         @"event": @"device",
         @"mac": device.mac ?: @"",
         @"name": device.name ?: @"Scale",
-        @"rssi": device.rssi ?: @(0),
+        @"rssi": device.RSSI ?: @(0),
         @"modelId": device.modeId ?: @"",
     }];
 }
 
 - (void)onStartScan {}
 - (void)onStopScan {}
-
-- (void)onScanFail:(int)code {
-    [self sendError:[NSString stringWithFormat:@"Scan failed (%d)", code]];
-}
 
 #pragma mark - Connection
 
@@ -261,7 +262,7 @@ static QnScalePlugin *sharedPlugin = nil;
     }
 
     double weight = 0;
-    QNScaleItemData *weightItem = [scaleData getItem:QNScaleWeight];
+    QNScaleItemData *weightItem = [scaleData getItem:QNScaleTypeWeight];
     if (weightItem) weight = weightItem.value;
 
     [self send:@{
@@ -277,8 +278,17 @@ static QnScalePlugin *sharedPlugin = nil;
 
 - (void)onGetElectric:(NSUInteger)electric device:(QNBleDevice *)device {}
 
-- (void)onScaleStateChange:(QNBleDevice *)device state:(QNScaleState)state {}
+- (void)onScaleStateChange:(QNBleDevice *)device
+                scaleState:(QNScaleState)state {
+    // Surfaced so the UI can say "measuring body composition" rather
+    // than sitting on a spinner. Bioimpedance only reads with bare
+    // feet, which is why the app says so before you step on.
+    if (state == QNScaleStateBodyFat) {
+        [self send:@{@"event": @"connection", @"state": @"measuring"}];
+    }
+}
 
-- (void)onScaleEventChange:(QNBleDevice *)device event:(QNScaleEvent)scaleEvent {}
+- (void)onScaleEventChange:(QNBleDevice *)device
+                scaleEvent:(QNScaleEvent)scaleEvent {}
 
 @end
