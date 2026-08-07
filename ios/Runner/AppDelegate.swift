@@ -2,8 +2,7 @@ import Flutter
 import UIKit
 import UserNotifications
 
-// Copy to ios/Runner/AppDelegate.swift, or merge the QnScalePlugin
-// registration into your existing one.
+// Copy to ios/Runner/AppDelegate.swift.
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -21,14 +20,10 @@ import UserNotifications
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
-    // The scale bridge registers here, alongside every other plugin.
-    // Registering it in didFinishLaunchingWithOptions instead would
-    // depend on the root view controller already being a
-    // FlutterViewController — and when it is not, the optional cast
-    // fails silently and the bridge is simply never wired, which
-    // surfaces in Dart as MissingPluginException with no clue why.
+    // The scale bridge, registered alongside every other plugin so the
+    // timing is never in question.
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "QnScalePlugin") {
-      QnScalePlugin.register(with: registrar.messenger())
+      QnScalePlugin.register(withMessenger: registrar.messenger())
     }
   }
 }
