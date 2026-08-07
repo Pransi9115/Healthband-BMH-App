@@ -150,8 +150,7 @@ class _ScalePairingScreenState extends State<ScalePairingScreen> {
       case QnState.done:      return _done();
       case QnState.measuring: return _measuring();
       case QnState.connected: return _standOn();
-      case QnState.connecting:return _status('Connecting to your scale',
-                                'Stay close to it while this finishes.');
+      case QnState.connecting:return _connecting();
       case QnState.error:     return _error();
       default:
         if (_scanExpired) return _notFound();
@@ -182,6 +181,19 @@ class _ScalePairingScreenState extends State<ScalePairingScreen> {
       const SizedBox(height: 12),
       for (final d in _qn.found) _deviceTile(d),
     ],
+  ]);
+
+  Widget _connecting() => Column(children: [
+    _hero(Icons.bluetooth_connected_rounded, pulse: true),
+    const SizedBox(height: 22),
+    Text('Connecting to your scale',
+      textAlign: TextAlign.center,
+      style: BMHText.heading2.copyWith(fontSize: 20)),
+    const SizedBox(height: 8),
+    Text('Stay close to it while this finishes.',
+      textAlign: TextAlign.center,
+      style: BMHText.bodySm.copyWith(
+        fontSize: 12.5, color: BMHColors.inkDim, height: 1.5)),
   ]);
 
   Widget _notFound() => Column(children: [
@@ -340,15 +352,28 @@ class _ScalePairingScreenState extends State<ScalePairingScreen> {
   ]);
 
   // ── PIECES ──────────────────────────────────────────────
+  /// [pulse] marks the states where the app is waiting on the scale
+  /// rather than on the person. The breathing glow is the difference
+  /// between "still working" and "stuck", which matters on a screen
+  /// where the honest answer is sometimes twenty seconds of nothing.
   Widget _hero(IconData icon, {Color tone = _accent, bool pulse = false}) =>
-    Center(child: Container(
-      width: 116, height: 116,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: tone.withOpacity(0.10),
-        border: Border.all(color: tone.withOpacity(0.4), width: 1.5),
-        boxShadow: [BoxShadow(
-          color: tone.withOpacity(0.22), blurRadius: 34, spreadRadius: 2)]),
+    Center(child: TweenAnimationBuilder<double>(
+      key: ValueKey('${icon.codePoint}_$pulse'),
+      tween: Tween(begin: pulse ? 0.55 : 1.0, end: 1.0),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (ctx, t, child) => Container(
+        width: 116, height: 116,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: tone.withOpacity(0.10),
+          border: Border.all(
+            color: tone.withOpacity(0.4), width: 1.5),
+          boxShadow: [BoxShadow(
+            color: tone.withOpacity(0.22 * t),
+            blurRadius: 34 * t,
+            spreadRadius: 2 * t)]),
+        child: child),
       child: Icon(icon, color: tone, size: 44)));
 
   Widget _foundCount(int n) => Container(
