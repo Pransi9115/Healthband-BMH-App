@@ -8,7 +8,6 @@ import '../body/ble/ble_intro_screen.dart';
 import '../wellness/wellness_screen.dart';
 import '../profile/profile_screen.dart';
 import '../body/ble/device_management_screen.dart';
-import '../body/body_track_screen.dart';
 import '../../core/ble/ble_service.dart';
 
 // ─────────────────────────────────────────────────────────
@@ -129,28 +128,15 @@ class _BodyScreenState extends State<_BodyScreen>
                   ),
                   const SizedBox(height: 28),
 
-                  // Body Track card — subtitle removed
-                  GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const BodyTrackScreen()),
-                    ),
+                  // Body Track card — feature paused, shown as Coming Soon
+                  Opacity(
+                    opacity: 0.62,
                     child: Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            BMHColors.sGut.withOpacity(0.10),
-                            BMHColors.sGut.withOpacity(0.02),
-                          ],
-                        ),
+                        color: BMHColors.surface,
                         borderRadius: BorderRadius.circular(BMHRadius.lg),
-                        border: Border.all(
-                          color: BMHColors.sGut.withOpacity(0.25),
-                        ),
+                        border: Border.all(color: BMHColors.line),
                       ),
                       child: Row(
                         children: [
@@ -160,23 +146,33 @@ class _BodyScreenState extends State<_BodyScreen>
                               children: [
                                 BMHEyebrow('Body composition'),
                                 const SizedBox(height: 8),
-                                Text.rich(
-                                  TextSpan(
-                                    style: BMHText.heading2
-                                        .copyWith(fontFamily: 'Fraunces'),
-                                    children: const [
-                                      TextSpan(text: 'View '),
-                                      TextSpan(
-                                        text: 'Bio Body Track',
-                                        style: TextStyle(
-                                          fontStyle: FontStyle.italic,
-                                          color: BMHColors.sGut,
-                                        ),
-                                      ),
-                                    ],
+                                Text(
+                                  'Bio Body Track',
+                                  style: BMHText.heading2.copyWith(
+                                    fontFamily: 'Fraunces',
+                                    fontStyle: FontStyle.italic,
+                                    color: BMHColors.inkMute,
                                   ),
                                 ),
-                                // REMOVED: Weight · Fat · Muscle · BMI · Water
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: BMHColors.bg4,
+                                    borderRadius:
+                                        BorderRadius.circular(BMHRadius.full),
+                                    border: Border.all(color: BMHColors.line),
+                                  ),
+                                  child: Text(
+                                    'COMING SOON',
+                                    style: BMHText.monoSm.copyWith(
+                                      fontSize: 8,
+                                      letterSpacing: 0.8,
+                                      color: BMHColors.inkDim,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -184,13 +180,13 @@ class _BodyScreenState extends State<_BodyScreen>
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: BMHColors.sGut,
+                              color: BMHColors.bg4,
                               shape: BoxShape.circle,
-                              boxShadow: BMHShadows.glow(BMHColors.sGut),
+                              border: Border.all(color: BMHColors.line),
                             ),
                             child: const Icon(
-                              Icons.arrow_forward_rounded,
-                              color: BMHColors.bg0,
+                              Icons.lock_outline_rounded,
+                              color: BMHColors.inkDim,
                               size: 18,
                             ),
                           ),

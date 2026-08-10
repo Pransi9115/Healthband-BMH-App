@@ -262,12 +262,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       signalColor: BMHColors.sSleep,
                       icon: const Icon(Icons.biotech_outlined),
                       expandedContent: const _BiomedicalMonitoringPreview()),
+                    // Bio Body Track is paused. Left as an inert card, the
+                    // same shape as Bio Care Team below, so the module is
+                    // still visible but nothing routes into it.
                     BMHModuleCard(
                       title: 'Bio Body Track',
-                      subtitle: 'BioScale · Composition',
+                      subtitle: 'BioScale · Composition · Coming soon',
                       signalColor: BMHColors.sBody,
-                      icon: const Icon(Icons.accessibility_new_outlined),
-                      expandedContent: _BodyModulePreview()),
+                      icon: const Icon(Icons.accessibility_new_outlined)),
                     BMHModuleCard(
                       title: 'Bio Care Team',
                       subtitle: 'Doctors · Coaches · Consults',
@@ -747,45 +749,6 @@ class _HealthModulePreview extends StatelessWidget {
     ]);
   }
 }
-
-class _BodyModulePreview extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(children: [
-      const Divider(height: 20),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: BMHColors.bg4,
-          borderRadius: BorderRadius.circular(BMHRadius.md)),
-        child: Row(children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: BMHColors.sBody.withOpacity(0.10),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: BMHColors.sBody.withOpacity(0.2))),
-            child: Icon(Icons.monitor_weight_outlined,
-              color: BMHColors.sBody.withOpacity(0.5), size: 20)),
-          const SizedBox(width: 14),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('BioScale not connected',
-                style: BMHText.bodyMd.copyWith(
-                  color: BMHColors.inkMute)),
-              const SizedBox(height: 3),
-              Text('Connect your BioScale to see body composition data',
-                style: BMHText.monoSm.copyWith(
-                  fontSize: 9, color: BMHColors.inkDim)),
-            ])),
-        ])),
-    ]);
-  }
-}
-
-// end of file
 
 // ─────────────────────────────────────────────────────────
 //  BIOMEDICAL MONITORING PREVIEW — Blood · GUT · DNA
