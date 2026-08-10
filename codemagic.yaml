@@ -17,6 +17,7 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.biohealthcare.bmhapp
+        auto_create_signing_files: true
       vars:
         XCODE_WORKSPACE: "ios/Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
