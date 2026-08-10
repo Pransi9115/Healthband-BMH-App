@@ -44,6 +44,8 @@ workflows:
       - name: Archive and export IPA
         script: |
           xcode-project use-profiles
+          xcode-project use-profiles
+          xcode-project use-profiles
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
@@ -70,6 +72,8 @@ workflows:
 
       - name: Archive and export IPA
         script: |
+          xcode-project use-profiles
+          xcode-project use-profiles
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
