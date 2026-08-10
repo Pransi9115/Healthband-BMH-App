@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../body/ble/scale_pairing_screen.dart';
 import '../../shared/theme/bmh_tokens.dart';
 import '../../shared/widgets/bmh_widgets.dart';
 import '../../shared/widgets/bmh_global_nav.dart';
@@ -215,9 +214,9 @@ class _BodyScreenState extends State<_BodyScreen>
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        // Device list either way — see _onBluetooth
-                        // in home_screen for why.
-                        builder: (_) => const DeviceManagementScreen(),
+                        builder: (_) => _ble.isBandConnected
+                            ? const DeviceManagementScreen()
+                            : const BleIntroScreen(isScale: false),
                       ),
                     ),
                   ),
@@ -233,7 +232,7 @@ class _BodyScreenState extends State<_BodyScreen>
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const ScalePairingScreen(),
+                        builder: (_) => const BleIntroScreen(isScale: true),
                       ),
                     ),
                   ),

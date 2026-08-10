@@ -180,11 +180,6 @@ class BleService extends ChangeNotifier {
   StreamSubscription? _scanSub;
   StreamSubscription? _notifySub;
   StreamSubscription? _connStateSub;
-  // The scale needs its own subscription. Sharing one with the band
-  // meant pairing a scale cancelled the band's disconnect listener,
-  // quietly killing auto-reconnect for the device that actually needs
-  // to stay connected all day.
-  StreamSubscription? _scaleConnSub;
   Timer? _keepAliveTimer;
   Timer? _refreshTimer;
   Timer? _reconnectTimer;
@@ -196,42 +191,6 @@ class BleService extends ChangeNotifier {
   bool get isRefreshing  => _isRefreshing;
   BMHBleDevice? get connectedBand  => _connectedBand;
   BMHBleDevice? get connectedScale => _connectedScale;
-
-  /// Releases the scale from the generic Bluetooth stack.
-  ///
-  /// The Qingniu SDK needs exclusive access to the peripheral, and two
-  /// stacks holding the same device produces connection failures that
-  /// look random. Called before handing over.
-  Future<void> disconnectScale() async {
-    try {
-      await _scaleConnSub?.cancel();
-      _scaleConnSub = null;
-      await _connectedScale?.device.disconnect();
-    } catch (_) {/* not connected */}
-    _connectedScale = null;
-    notifyListeners();
-  }
-
-  /// Has a scale ever been paired on this device?
-  ///
-  /// This is the question the UI should ask, not "is it connected
-  /// right now". A scale is connected for seconds at a time; asking
-  /// about the live link tells you almost nothing about whether the
-  /// patient owns one.
-  bool _scaleEverPaired = false;
-  String? _scaleName;
-  bool get scaleEverPaired => _scaleEverPaired;
-  String? get scaleName => _scaleName;
-  static const _kScaleName = 'bmh_scale_name';
-
-  Future<void> loadScaleMemory() async {
-    final p = await SharedPreferences.getInstance();
-    _scaleName = p.getString(_kScaleName);
-    if (_scaleName != null) {
-      _scaleEverPaired = true;
-      notifyListeners();
-    }
-  }
   List<BMHBleDevice> get scannedDevices => List.unmodifiable(_scanned);
   String? get error      => _error;
   // ── VITAL GETTERS — gated by _isWearing ──────────────────────────────────
@@ -583,28 +542,20 @@ class BleService extends ChangeNotifier {
       // Listen for disconnect — keep trying to reconnect (fast at first,
       // then a slower persistent retry) until reconnected or the user
       // explicitly disconnects. Never silently gives up.
-      if (dev.type != BMHDeviceType.bioScale) {
-        _connStateSub?.cancel();
-        _connStateSub = dev.device.connectionState.listen((state) async {
-          if (state == BluetoothConnectionState.disconnected) {
+      _connStateSub?.cancel();
+      _connStateSub = dev.device.connectionState.listen((state) async {
+        if (state == BluetoothConnectionState.disconnected) {
+          if (dev.type != BMHDeviceType.bioScale) {
             _connectedBand = null;
             _writeChar = null;
             _stopTimers();
             _scheduleReconnect();
-          }
-        });
-      } else {
-        // A scale drops as soon as it has sent its reading — that is
-        // normal, not a fault, so there is nothing to reconnect. What
-        // matters afterwards is the measurement, not the link.
-        _scaleConnSub?.cancel();
-        _scaleConnSub = dev.device.connectionState.listen((state) {
-          if (state == BluetoothConnectionState.disconnected) {
+          } else {
             _connectedScale = null;
             notifyListeners();
           }
-        });
-      }
+        }
+      });
 
       // Discover services and find FFF0/FFF6/FFF7
       final services = await dev.device.discoverServices();
@@ -665,9 +616,6 @@ class BleService extends ChangeNotifier {
         Future.delayed(const Duration(seconds: 3), () => _syncBandHistory());
       } else {
         _connectedScale = dev;
-        _scaleEverPaired = true;
-        SharedPreferences.getInstance()
-            .then((p) => p.setString(_kScaleName, dev.name));
       }
 
       _isConnecting = false;
@@ -1844,7 +1792,6 @@ class BleService extends ChangeNotifier {
         _isReconnecting     = false;
         _measurementInProgress.clear(); // no measurements in flight after disconnect
       } else {
-        _scaleConnSub?.cancel();
         await _connectedScale?.device.disconnect();
         _connectedScale = null;
       }
@@ -1855,7 +1802,7 @@ class BleService extends ChangeNotifier {
   @override
   void dispose() {
     _scanSub?.cancel(); _notifySub?.cancel();
-    _connStateSub?.cancel(); _scaleConnSub?.cancel(); _stopTimers();
+    _connStateSub?.cancel(); _stopTimers();
     _reconnectTimer?.cancel();
     super.dispose();
   }

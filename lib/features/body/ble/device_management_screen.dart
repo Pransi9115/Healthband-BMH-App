@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'scale_pairing_screen.dart';
 import '../../../core/ble/ble_service.dart';
 import '../../../shared/theme/bmh_tokens.dart';
 import '../../../shared/widgets/bmh_widgets.dart';
@@ -106,7 +105,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const ScalePairingScreen(),
+                          builder: (_) => const BleIntroScreen(isScale: true),
                         ),
                       ),
                     ),

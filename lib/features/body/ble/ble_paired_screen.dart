@@ -5,8 +5,6 @@ import '../../../shared/widgets/bmh_widgets.dart';
 import '../../health/live_health_screen.dart';
 import '../../../shared/widgets/bmh_screen.dart';
 import '../../../shared/widgets/bmh_global_nav.dart';
-import '../../../core/body/lefu_scale_service.dart';
-import '../../body/body_track_screen.dart';
 
 class BlePairedScreen extends StatefulWidget {
   final BMHBleDevice device;
@@ -35,60 +33,6 @@ class _BlePairedScreenState extends State<BlePairedScreen>
       parent: _checkCtrl, curve: Curves.elasticOut,
     );
     _ble.addListener(_onBleChange);
-
-    // A BioScale cannot be read over generic Bluetooth — Qingniu use a
-    // proprietary protocol, so the reading has to come through their
-    // SDK. Hand the device over to that bridge as soon as we land here.
-    if (widget.isScale) {
-      _qn.addListener(_onQnChange);
-      _startScaleSession();
-    }
-  }
-
-  final _qn = LefuScaleService.instance;
-
-  void _onQnChange() { if (mounted) setState(() {}); }
-
-  Future<void> _startScaleSession() async {
-    await _qn.init();
-    if (!mounted || !_qn.isAvailable) return;
-
-    // Two Bluetooth stacks must not hold the same peripheral at once,
-    // so the generic connection is dropped before the SDK takes over.
-    try {
-      await _ble.disconnectScale();
-    } catch (_) {/* nothing held it */}
-
-    await _qn.startScan();
-
-    // Match the device the user already chose, by identifier first and
-    // by name as a fallback — iOS reports a CoreBluetooth UUID where
-    // Android reports a MAC, and the two stacks do not always agree.
-    for (var i = 0; i < 40 && mounted; i++) {
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (_qn.state == ScaleState.connected ||
-          _qn.state == ScaleState.measuring ||
-          _qn.state == ScaleState.done) return;
-
-      ScaleDevice? match;
-      for (final d in _qn.found) {
-        if (d.mac.toLowerCase() == widget.device.id.toLowerCase() ||
-            (d.name.isNotEmpty &&
-             d.name.toLowerCase() == widget.device.name.toLowerCase())) {
-          match = d;
-          break;
-        }
-      }
-      // Only one scale is usually in range, so fall back to the first
-      // thing the SDK recognises rather than stalling on a mismatch.
-      match ??= _qn.found.isNotEmpty ? _qn.found.first : null;
-
-      if (match != null) {
-        await _qn.stopScan();
-        await _qn.connect(match.mac);
-        return;
-      }
-    }
   }
 
   void _onBleChange() { if (mounted) setState(() {}); }
@@ -97,7 +41,6 @@ class _BlePairedScreenState extends State<BlePairedScreen>
   void dispose() {
     _checkCtrl.dispose();
     _ble.removeListener(_onBleChange);
-    if (widget.isScale) _qn.removeListener(_onQnChange);
     super.dispose();
   }
 
@@ -180,7 +123,7 @@ class _BlePairedScreenState extends State<BlePairedScreen>
               if (!widget.isScale)
                 _BandLivePreview(ble: _ble, color: color)
               else
-                _ScaleLivePreview(color: color, qn: _qn),
+                _ScaleLivePreview(color: color),
 
               const SizedBox(height: 24),
 
@@ -375,141 +318,33 @@ class _LiveTile extends StatelessWidget {
 
 class _ScaleLivePreview extends StatelessWidget {
   final Color color;
-  final LefuScaleService qn;
-  const _ScaleLivePreview({required this.color, required this.qn});
+  const _ScaleLivePreview({required this.color});
 
   @override
   Widget build(BuildContext context) {
-    // The SDK is missing or would not initialise. Say so plainly
-    // rather than leaving a spinner running forever.
-    if (!qn.isAvailable) {
-      return _shell(children: [
-        const BMHEyebrow('Scale reading unavailable', showDot: false),
-        const SizedBox(height: 14),
-        const Icon(Icons.error_outline_rounded,
-          color: BMHColors.warn, size: 40),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: BMHColors.surface,
+        borderRadius: BorderRadius.circular(BMHRadius.lg),
+        border: Border.all(color: color.withOpacity(0.20)),
+      ),
+      child: Column(children: [
+        BMHEyebrow('Step on scale to measure', showDot: true),
+        const SizedBox(height: 16),
+        Icon(Icons.monitor_weight_outlined, color: color, size: 48),
         const SizedBox(height: 12),
         Text(
-          qn.error ??
-            'This build cannot read from the BioScale.',
-          textAlign: TextAlign.center,
-          style: BMHText.bodySm.copyWith(
-            fontSize: 11.5, color: BMHColors.inkDim, height: 1.5)),
-      ]);
-    }
-
-    switch (qn.state) {
-      case ScaleState.done:
-        final c = qn.last;
-        return _shell(children: [
-          const BMHEyebrow('Measurement complete', showDot: true),
-          const SizedBox(height: 16),
-          Row(mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text((c?.weightKg ?? qn.liveWeight).toStringAsFixed(1),
-                style: BMHText.displayMd.copyWith(
-                  fontSize: 44, color: color, height: 1)),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6, left: 4),
-                child: Text('kg',
-                  style: BMHText.bodySm.copyWith(
-                    fontSize: 13, color: BMHColors.inkDim))),
-            ]),
-          if (c != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              '${c.bodyFatPct.toStringAsFixed(1)}% body fat · '
-              '${c.muscleKg.toStringAsFixed(1)} kg muscle',
-              style: BMHText.monoSm.copyWith(
-                fontSize: 10, color: BMHColors.inkDim)),
-          ],
-          const SizedBox(height: 18),
-          GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => const BodyTrackScreen())),
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(BMHRadius.full)),
-              child: Text('See your full report',
-                textAlign: TextAlign.center,
-                style: BMHText.labelLg.copyWith(
-                  color: BMHColors.bg0,
-                  fontWeight: FontWeight.w600)))),
-        ]);
-
-      case ScaleState.measuring:
-        return _shell(children: [
-          const BMHEyebrow('Reading', showDot: true),
-          const SizedBox(height: 16),
-          Row(mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(qn.liveWeight.toStringAsFixed(1),
-                style: BMHText.displayMd.copyWith(
-                  fontSize: 44, color: color, height: 1)),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6, left: 4),
-                child: Text('kg',
-                  style: BMHText.bodySm.copyWith(
-                    fontSize: 13, color: BMHColors.inkDim))),
-            ]),
-          const SizedBox(height: 10),
-          // The number is still moving. Saying so stops anyone reading
-          // a settling value as their weight.
-          Text('Hold still while it settles',
-            style: BMHText.italic, textAlign: TextAlign.center),
-        ]);
-
-      case ScaleState.error:
-        return _shell(children: [
-          const BMHEyebrow('Could not read the scale', showDot: false),
-          const SizedBox(height: 14),
-          const Icon(Icons.error_outline_rounded,
-            color: BMHColors.warn, size: 40),
-          const SizedBox(height: 12),
-          Text(qn.error ?? 'Something went wrong.',
-            textAlign: TextAlign.center,
-            style: BMHText.bodySm.copyWith(
-              fontSize: 11.5, color: BMHColors.inkDim, height: 1.5)),
-        ]);
-
-      default:
-        final connecting = qn.state == ScaleState.connecting ||
-                           qn.state == ScaleState.scanning;
-        return _shell(children: [
-          BMHEyebrow(
-            connecting ? 'Preparing your scale' : 'Step on scale to measure',
-            showDot: true),
-          const SizedBox(height: 16),
-          Icon(Icons.monitor_weight_outlined, color: color, size: 48),
-          const SizedBox(height: 12),
-          Text(
-            connecting
-              ? 'Getting the scale ready.\nThis takes a moment.'
-              : 'Stand on your BioScale with\nbare feet to get a reading',
-            style: BMHText.italic, textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            BMHPulsingDot(color: color, size: 6),
-            const SizedBox(width: 8),
-            Text(
-              connecting ? 'Connecting...' : 'Waiting for reading...',
-              style: BMHText.monoSm.copyWith(color: color)),
-          ]),
-        ]);
-    }
+          'Stand on your BioScale to\nget your first reading',
+          style: BMHText.italic, textAlign: TextAlign.center),
+        const SizedBox(height: 16),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          BMHPulsingDot(color: color, size: 6),
+          const SizedBox(width: 8),
+          Text('Waiting for reading...',
+            style: BMHText.monoSm.copyWith(color: color)),
+        ]),
+      ]),
+    );
   }
-
-  Widget _shell({required List<Widget> children}) => Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: BMHColors.surface,
-      borderRadius: BorderRadius.circular(BMHRadius.lg),
-      border: Border.all(color: color.withOpacity(0.20))),
-    child: Column(children: children));
 }
