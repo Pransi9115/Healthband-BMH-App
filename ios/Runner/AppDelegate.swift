@@ -1,8 +1,6 @@
-import Flutter
+﻿import Flutter
 import UIKit
 import UserNotifications
-
-// Copy to ios/Runner/AppDelegate.swift.
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -19,11 +17,5 @@ import UserNotifications
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-
-    // The scale bridge, registered alongside every other plugin so the
-    // timing is never in question.
-    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "QnScalePlugin") {
-      QnScalePlugin.register(with: registrar.messenger())
-    }
   }
 }
