@@ -1,141 +1,101 @@
+# ─────────────────────────────────────────────────────────────
+# NeuralCalm — cloud builds, no local Flutter needed.
+#
+# The repo ships only lib/ + assets/ + pubspec.yaml. Each build:
+#  1. generates the android/ and ios/ native folders,
+#  2. applies required Android tweaks (minSdk 23 for Firebase,
+#     INTERNET permission for release builds),
+#  3. generates the app launcher icon from assets/icon/app_icon.png,
+#  4. builds.
+# ─────────────────────────────────────────────────────────────
+
+definitions:
+  scripts:
+    - &create_platforms
+      name: Generate native platform folders
+      script: |
+        cp pubspec.yaml pubspec.keep.yaml
+        flutter create . --org com.neuralcalm --project-name neuralcalm --platforms=android,ios
+        mv -f pubspec.keep.yaml pubspec.yaml
+    - &android_tweaks
+      name: Android tweaks (minSdk 23 + INTERNET permission)
+      script: |
+        for f in android/app/build.gradle android/app/build.gradle.kts; do
+          if [ -f "$f" ]; then sed -i.bak 's/flutter.minSdkVersion/23/g' "$f"; fi
+        done
+        M=android/app/src/main/AndroidManifest.xml
+        if [ -f "$M" ] && ! grep -q "android.permission.INTERNET" "$M"; then
+          sed -i.bak 's|<application|<uses-permission android:name="android.permission.INTERNET"/><application|' "$M"
+        fi
+    - &pub_get
+      name: Get packages
+      script: flutter pub get
+    - &launcher_icons
+      name: Generate app launcher icons
+      script: dart run flutter_launcher_icons
+
 workflows:
 
-  # ─────────────────────────────────────────────────────────
-  # iOS — build and upload to TestFlight
-  # ─────────────────────────────────────────────────────────
-  ios-workflow:
-    name: iOS TestFlight
-    instance_type: mac_mini_m2
+  # 1) Runs automatically on every push to main → debug APK for your phone.
+  android-debug:
+    name: Android debug APK
     max_build_duration: 60
-
     environment:
+      flutter: stable
       groups:
-        - appstore_credentials
-      vars:
-        BUNDLE_ID: "com.biohealthcare.bmhapp"
-        XCODE_WORKSPACE: "ios/Runner.xcworkspace"
-        XCODE_SCHEME: "Runner"
-      flutter: stable
-      xcode: latest
-      cocoapods: default
-
+        - keys
     triggering:
       events:
         - push
       branch_patterns:
         - pattern: main
           include: true
-          source: true
-
     scripts:
-
-      - name: Set up code signing
-        script: |
-          echo "$AUTH_KEY_B64" | base64 --decode > /tmp/authkey.p8
-          head -1 /tmp/authkey.p8
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --platform IOS \
-            --issuer-id "$APP_STORE_ISSUER_ID" \
-            --key-id "$APP_STORE_KEY_ID" \
-            --private-key @file:/tmp/authkey.p8 \
-            --create
-          keychain initialize
-          keychain add-certificates
-
-      - name: Install dependencies
-        script: |
-          flutter pub get
-          find . -name "Podfile" -execdir pod install \;
-
-      - name: Set build number from TestFlight
-        script: |
-          LATEST=$(app-store-connect get-latest-testflight-build-number \
-            --bundle-id "$BUNDLE_ID" \
-            --issuer-id "$APP_STORE_ISSUER_ID" \
-            --key-id "$APP_STORE_KEY_ID" \
-            --private-key @file:/tmp/authkey.p8 2>/dev/null || echo "0")
-          echo "Latest TestFlight build: $LATEST"
-          echo "BUILD_NUMBER=$(($LATEST + 1))" >> $CM_ENV
-
-      - name: Build Flutter (unsigned)
-        script: |
-          flutter build ios --release --no-codesign \
-            --build-number=$BUILD_NUMBER
-
-      - name: Archive and export IPA
-        script: |
-          xcode-project use-profiles
-          xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
-
+      - *create_platforms
+      - *android_tweaks
+      - *pub_get
+      - *launcher_icons
+      - name: Build debug APK
+        script: flutter build apk --debug --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
     artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
-      - flutter_drive.log
+      - build/app/outputs/flutter-apk/app-debug.apk
 
-    publishing:
-      app_store_connect:
-        api_key: $AUTH_KEY_B64
-        key_id: $APP_STORE_KEY_ID
-        issuer_id: $APP_STORE_ISSUER_ID
-        submit_to_testflight: true
-        submit_to_app_store: false
-      email:
-        recipients:
-          - pransipatel9115@gmail.com
-        notify:
-          success: true
-          failure: true
-
-  # ─────────────────────────────────────────────────────────
-  # Android — build AAB + APKs
-  # ─────────────────────────────────────────────────────────
-  android-workflow:
-    name: Android Release
-    instance_type: mac_mini_m2
+  # 2) Start manually when we reach Play Store prep.
+  #    Before first store upload: add your keystore in
+  #    Codemagic → Code signing identities, then attach it here.
+  android-release:
+    name: Android release AAB (Play Store - manual)
     max_build_duration: 60
-
     environment:
-      android_signing:
-        - bmh_keystore
       flutter: stable
-
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: main
-          include: true
-          source: true
-
+      groups:
+        - keys
     scripts:
-
-      - name: Install dependencies
-        script: flutter pub get
-
-      - name: Static analysis
-        script: flutter analyze --no-fatal-infos
-        ignore_failure: true
-
-      - name: Build AAB and APK
-        script: |
-          flutter build appbundle --release \
-            --build-number=$PROJECT_BUILD_NUMBER
-          flutter build apk --release --split-per-abi \
-            --build-number=$PROJECT_BUILD_NUMBER
-
+      - *create_platforms
+      - *android_tweaks
+      - *pub_get
+      - *launcher_icons
+      - name: Build release AAB
+        script: flutter build appbundle --release --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
     artifacts:
-      - build/**/outputs/bundle/**/*.aab
-      - build/**/outputs/flutter-apk/*.apk
-      - build/**/outputs/**/mapping.txt
+      - build/app/outputs/bundle/release/*.aab
 
-    publishing:
-      email:
-        recipients:
-          - pransipatel9115@gmail.com
-        notify:
-          success: true
-          failure: true
-          
+  # 3) Start manually. Verifies the iOS build compiles (Codemagic
+  #    machines are Macs). Device installs / App Store need your
+  #    Apple Developer account connected — done at store-prep time.
+  ios-verify:
+    name: iOS build check (unsigned - manual)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      groups:
+        - keys
+    scripts:
+      - *create_platforms
+      - *pub_get
+      - *launcher_icons
+      - name: Build iOS (unsigned)
+        script: flutter build ios --release --no-codesign --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+    artifacts:
+      - build/ios/iphoneos/*.app
