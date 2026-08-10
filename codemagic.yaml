@@ -57,11 +57,16 @@ workflows:
           echo "Latest TestFlight build: $LATEST"
           echo "BUILD_NUMBER=$(($LATEST + 1))" >> $CM_ENV
 
-      - name: Build IPA
+      - name: Build Flutter (unsigned)
         script: |
-          flutter build ipa --release \
-            --build-number=$BUILD_NUMBER \
-            --export-options-plist=/Users/builder/export_options.plist
+          flutter build ios --release --no-codesign \
+            --build-number=$BUILD_NUMBER
+
+      - name: Archive and export IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
 
     artifacts:
       - build/ios/ipa/*.ipa
