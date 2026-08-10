@@ -2,17 +2,22 @@ workflows:
 
   # ─────────────────────────────────────────────────────────
   # iOS — build and upload to TestFlight
+  # Signing is handled by the Developer Portal integration.
+  # No AUTH_KEY / KEY_ID / ISSUER_ID variables needed.
   # ─────────────────────────────────────────────────────────
   ios-workflow:
     name: iOS TestFlight
     instance_type: mac_mini_m2
     max_build_duration: 60
 
+    integrations:
+      app_store_connect: BMH
+
     environment:
-      groups:
-        - appstore_credentials
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.biohealthcare.bmhapp
       vars:
-        BUNDLE_ID: "com.biohealthcare.bmhapp"
         XCODE_WORKSPACE: "ios/Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
       flutter: stable
@@ -29,45 +34,15 @@ workflows:
 
     scripts:
 
-      - name: Debug env
-        script: |
-          echo "ISSUER len:  ${#APP_STORE_ISSUER_ID}"
-          echo "KEY_ID len:  ${#APP_STORE_KEY_ID}"
-          echo "B64 len:     ${#AUTH_KEY_B64}"
-
-      - name: Set up code signing
-        script: |
-          echo "$AUTH_KEY_B64" | base64 --decode > /tmp/authkey.p8
-          head -1 /tmp/authkey.p8
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --platform IOS \
-            --issuer-id "$APP_STORE_ISSUER_ID" \
-            --key-id "$APP_STORE_KEY_ID" \
-            --private-key @file:/tmp/authkey.p8 \
-            --create
-          keychain initialize
-          keychain add-certificates
-
       - name: Install dependencies
         script: |
           flutter pub get
           find . -name "Podfile" -execdir pod install \;
 
-      - name: Set build number from TestFlight
-        script: |
-          LATEST=$(app-store-connect get-latest-testflight-build-number \
-            --bundle-id "$BUNDLE_ID" \
-            --issuer-id "$APP_STORE_ISSUER_ID" \
-            --key-id "$APP_STORE_KEY_ID" \
-            --private-key @file:/tmp/authkey.p8 2>/dev/null || echo "0")
-          echo "Latest TestFlight build: $LATEST"
-          echo "BUILD_NUMBER=$(($LATEST + 1))" >> $CM_ENV
-
       - name: Build Flutter (unsigned)
         script: |
           flutter build ios --release --no-codesign \
-            --build-number=$BUILD_NUMBER
+            --build-number=$PROJECT_BUILD_NUMBER
 
       - name: Archive and export IPA
         script: |
@@ -83,9 +58,7 @@ workflows:
 
     publishing:
       app_store_connect:
-        api_key: $AUTH_KEY_B64
-        key_id: $APP_STORE_KEY_ID
-        issuer_id: $APP_STORE_ISSUER_ID
+        auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
       email:
