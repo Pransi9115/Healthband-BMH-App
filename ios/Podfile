@@ -31,7 +31,6 @@ target 'Runner' do
   # Qingniu scale SDK. static_framework in the podspec means this
   # builds as a module under use_frameworks!, so Swift can import it
   # directly with no bridging header.
-  pod 'QNSDK', '2.36.3'
 
   target 'RunnerTests' do
     inherit! :search_paths
@@ -51,7 +50,6 @@ post_install do |installer|
         'PERMISSION_NOTIFICATIONS=1',
       ]
 
-      # QNSDK ships no arm64 simulator slice, so an Apple Silicon Mac
       # cannot build for the simulator. Device builds are unaffected.
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
