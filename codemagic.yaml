@@ -29,14 +29,18 @@ workflows:
 
     scripts:
 
-      - name: Set up code signing
+     - name: Set up code signing
         script: |
+          echo "$AUTH_KEY_B64" | base64 --decode > /tmp/authkey.p8
+          head -1 /tmp/authkey.p8
+          echo "$AUTH_KEY_B64" | base64 --decode > /tmp/authkey.p8
+          head -1 /tmp/authkey.p8
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --platform IOS \
             --issuer-id "$APP_STORE_ISSUER_ID" \
             --key-id "$APP_STORE_KEY_ID" \
-            --private-key "$AUTH_KEY" \
+            --private-key @file:/tmp/authkey.p8 \
             --create
           keychain initialize
           keychain add-certificates
@@ -61,7 +65,7 @@ workflows:
             --bundle-id "$BUNDLE_ID" \
             --issuer-id "$APP_STORE_ISSUER_ID" \
             --key-id "$APP_STORE_KEY_ID" \
-            --private-key "$AUTH_KEY" 2>/dev/null || echo "0")
+            --private-key @file:/tmp/authkey.p8 2>/dev/null || echo "0")
           echo "Latest TestFlight build: $LATEST"
           echo "BUILD_NUMBER=$(($LATEST + 1))" >> $CM_ENV
 
@@ -146,3 +150,4 @@ workflows:
         notify:
           success: true
           failure: true
+          
