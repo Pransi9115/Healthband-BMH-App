@@ -34,6 +34,8 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
   final _searchC = TextEditingController();
   final _nameC = TextEditingController();
   final _noteC = TextEditingController();
+  final _searchFocus = FocusNode();
+  final _strengthC = TextEditingController();
 
   bool _picking = false;      // catalog list open
   bool _freeText = false;     // "not listed" — type the name
@@ -71,9 +73,11 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     final e = widget.existing;
     if (e != null) {
       _nameC.text = e.name;
+      _searchC.text = e.name;
       _brand = e.brand;
       _klass = e.klass;
       _strength = e.strength;
+      _strengthC.text = e.strength;
       _unit = e.unit.isEmpty ? 'mg' : e.unit;
       _form = e.form;
       _quantity = e.quantity.isEmpty
@@ -107,6 +111,8 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     _searchC.dispose();
     _nameC.dispose();
     _noteC.dispose();
+    _strengthC.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -132,12 +138,14 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
       final parts = e.defaultStrength.split(' ');
       _strength = parts.isNotEmpty ? parts.first : '';
+      _strengthC.text = _strength;
       _unit = parts.length > 1 ? parts.sublist(1).join(' ') : 'mg';
 
       _affects = List.of(e.affects);
       _affectsAuto = e.affects.isNotEmpty;
-      _searchC.clear();
+      _searchC.text = e.generic;
     });
+    _searchFocus.unfocus();
   }
 
   /// When someone searched "Glycomet", remember that brand.
@@ -162,8 +170,9 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       _catalogNote = '';
       _affects = [];
       _affectsAuto = false;
-      _searchC.clear();
+      _searchC.text = _nameC.text;
     });
+    _searchFocus.unfocus();
   }
 
   void _setTimesPerDay(int n) {
@@ -296,9 +305,10 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
             // ── MEDICINE ──────────────────────────────────
             _label('Medicine'),
-            if (_picking) _picker() else _chosenName(),
+            _medicineField(),
+            _suggestions(),
 
-            if (!_picking) ...[
+            ...[
               const SizedBox(height: 16),
 
               // ── STRENGTH · UNIT · FORM ──────────────────
@@ -318,6 +328,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                       value: MedicineOptions.units.contains(_unit)
                         ? _unit : MedicineOptions.units.first,
                       items: MedicineOptions.units,
+                      title: 'Unit',
                       onChanged: (v) => setState(() => _unit = v)),
                   ])),
                 const SizedBox(width: 9),
@@ -329,6 +340,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                       value: _formOptions.contains(_form)
                         ? _form : _formOptions.first,
                       items: _formOptions,
+                      title: 'Form',
                       onChanged: (v) => setState(() {
                         _form = v;
                         _quantity = MedicineOptions.quantitiesFor(v).first;
@@ -343,6 +355,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                   ? _quantity
                   : MedicineOptions.quantitiesFor(_form).first,
                 items: MedicineOptions.quantitiesFor(_form),
+                title: 'Quantity per dose',
                 onChanged: (v) => setState(() => _quantity = v)),
 
               const SizedBox(height: 20),
@@ -611,134 +624,160 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     );
   }
 
-  // ── MEDICINE PICKER ─────────────────────────────────────
-  Widget _picker() {
-    final results = MedicineCatalog.search(_searchC.text, limit: 30);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: BMHColors.bg3,
-          borderRadius: BorderRadius.circular(BMHRadius.md),
-          border: Border.all(color: _accent.withOpacity(0.45))),
-        child: Row(children: [
-          const Icon(Icons.search_rounded,
-            color: BMHColors.inkDim, size: 16),
-          const SizedBox(width: 8),
-          Expanded(child: TextField(
+  // ── MEDICINE FIELD + INLINE SUGGESTIONS ─────────────────
+  // The field stays in place. Typing filters the catalog and the
+  // matches drop in directly beneath it, so the rest of the form
+  // never disappears behind a separate picker screen.
+
+  bool get _showSuggest =>
+      _picking && _searchC.text.trim().isNotEmpty;
+
+  List<MedicineEntry> get _results =>
+      MedicineCatalog.search(_searchC.text, limit: 8);
+
+  Widget _medicineField() => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    decoration: BoxDecoration(
+      color: BMHColors.bg3,
+      borderRadius: BorderRadius.only(
+        topLeft: const Radius.circular(BMHRadius.md),
+        topRight: const Radius.circular(BMHRadius.md),
+        bottomLeft: Radius.circular(_showSuggest ? 0 : BMHRadius.md),
+        bottomRight: Radius.circular(_showSuggest ? 0 : BMHRadius.md)),
+      border: Border.all(
+        color: _picking ? _accent.withOpacity(0.45) : BMHColors.line)),
+    child: Row(children: [
+      Icon(_picking ? Icons.search_rounded : Icons.medication_outlined,
+        color: _picking ? _accent : BMHColors.inkDim, size: 16),
+      const SizedBox(width: 9),
+      Expanded(child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
             controller: _searchC,
+            focusNode: _searchFocus,
             autofocus: !_isEdit,
-            onChanged: (_) => setState(() {}),
+            textCapitalization: TextCapitalization.words,
+            onTap: () => setState(() => _picking = true),
+            onChanged: (v) => setState(() {
+              _picking = true;
+              _nameC.text = v.trim();
+              if (v.trim().isEmpty) {
+                _brand = '';
+                _klass = '';
+                _catalogNote = '';
+                _strengthOptions = const [];
+                _formOptions = MedicineOptions.forms;
+                _affects = [];
+                _affectsAuto = false;
+              }
+            }),
             style: BMHText.bodyMd.copyWith(color: BMHColors.ink),
             decoration: InputDecoration(
               isDense: true,
+              filled: false,
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 13),
               hintText: 'Search brand or generic name',
               hintStyle: BMHText.bodySm.copyWith(
-                fontSize: 12, color: BMHColors.inkMute)))),
-          if (_searchC.text.isNotEmpty)
-            GestureDetector(
-              onTap: () => setState(() => _searchC.clear()),
-              child: const Icon(Icons.close_rounded,
-                color: BMHColors.inkDim, size: 15)),
+                fontSize: 12, color: BMHColors.inkMute))),
+          if (!_picking && (_klass.isNotEmpty || _brand.isNotEmpty))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 9),
+              child: Text(
+                [if (_brand.isNotEmpty) _brand, if (_klass.isNotEmpty) _klass]
+                    .join('  ·  '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: BMHText.monoSm.copyWith(
+                  fontSize: 9, color: BMHColors.inkMute))),
         ])),
+      if (_searchC.text.isNotEmpty)
+        GestureDetector(
+          onTap: () => setState(() {
+            _searchC.clear();
+            _nameC.clear();
+            _brand = '';
+            _klass = '';
+            _catalogNote = '';
+            _strengthOptions = const [];
+            _formOptions = MedicineOptions.forms;
+            _affects = [];
+            _affectsAuto = false;
+            _picking = true;
+          }),
+          behavior: HitTestBehavior.opaque,
+          child: const Padding(
+            padding: EdgeInsets.all(4),
+            child: Icon(Icons.close_rounded,
+              color: BMHColors.inkDim, size: 15))),
+    ]));
 
-      const SizedBox(height: 6),
-      Text('Search "Glycomet" or "Metformin" — both find the same entry.',
-        style: BMHText.bodySm.copyWith(
-          fontSize: 10, color: BMHColors.inkMute)),
-      const SizedBox(height: 10),
-
-      Container(
-        decoration: BoxDecoration(
-          color: BMHColors.bg2,
-          borderRadius: BorderRadius.circular(BMHRadius.md),
-          border: Border.all(color: BMHColors.line)),
-        child: Column(children: [
-          for (final e in results)
-            GestureDetector(
-              onTap: () => _choose(e),
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13, vertical: 10),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(
-                    color: BMHColors.lineSoft))),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(e.generic,
-                      style: BMHText.labelMd.copyWith(
-                        fontSize: 13, color: BMHColors.ink)),
-                    const SizedBox(height: 2),
-                    Text(e.brandLine,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: BMHText.monoSm.copyWith(
-                        fontSize: 9, color: BMHColors.inkMute)),
-                  ]))),
-
+  Widget _suggestions() {
+    if (!_showSuggest) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          'Search "Glycomet" or "Metformin" — both find the same entry.',
+          style: BMHText.bodySm.copyWith(
+            fontSize: 10, color: BMHColors.inkMute)));
+    }
+    final results = _results;
+    return Container(
+      decoration: BoxDecoration(
+        color: BMHColors.bg2,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(BMHRadius.md)),
+        border: Border.all(color: _accent.withOpacity(0.45))),
+      child: Column(children: [
+        for (final e in results)
           GestureDetector(
-            onTap: _typeMyOwn,
+            onTap: () => _choose(e),
             behavior: HitTestBehavior.opaque,
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(
-                horizontal: 13, vertical: 13),
-              child: Row(children: [
-                const Icon(Icons.add_rounded, color: _accent, size: 15),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Not listed — type your own',
-                  style: BMHText.labelMd.copyWith(
-                    fontSize: 12, color: _accent))),
-              ]))),
-        ])),
-    ]);
+                horizontal: 13, vertical: 10),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(
+                  color: BMHColors.lineSoft))),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(e.generic,
+                    style: BMHText.labelMd.copyWith(
+                      fontSize: 13, color: BMHColors.ink)),
+                  const SizedBox(height: 2),
+                  Text(e.brandLine,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: BMHText.monoSm.copyWith(
+                      fontSize: 9, color: BMHColors.inkMute)),
+                ]))),
+        GestureDetector(
+          onTap: _typeMyOwn,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 13, vertical: 13),
+            child: Row(children: [
+              const Icon(Icons.add_rounded, color: _accent, size: 15),
+              const SizedBox(width: 8),
+              Expanded(child: Text(
+                results.isEmpty
+                  ? 'Use "${_searchC.text.trim()}"'
+                  : 'Not listed — use what I typed',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: BMHText.labelMd.copyWith(
+                  fontSize: 12, color: _accent))),
+            ]))),
+      ]));
   }
-
-  Widget _chosenName() => GestureDetector(
-    onTap: () => setState(() => _picking = true),
-    behavior: HitTestBehavior.opaque,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      decoration: BoxDecoration(
-        color: BMHColors.bg3,
-        borderRadius: BorderRadius.circular(BMHRadius.md),
-        border: Border.all(color: BMHColors.line)),
-      child: Row(children: [
-        Expanded(child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _freeText && _nameC.text.isEmpty
-              ? TextField(
-                  controller: _nameC,
-                  onChanged: (_) => setState(() {}),
-                  style: BMHText.bodyMd.copyWith(color: BMHColors.ink),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    hintText: 'Type the medicine name',
-                    hintStyle: BMHText.bodySm.copyWith(
-                      fontSize: 12, color: BMHColors.inkMute)))
-              : Text(
-                  _brand.isEmpty
-                    ? _nameC.text
-                    : '${_nameC.text} ($_brand)',
-                  style: BMHText.bodyMd.copyWith(color: BMHColors.ink)),
-            if (_klass.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(_klass,
-                style: BMHText.monoSm.copyWith(
-                  fontSize: 9, color: BMHColors.inkMute)),
-            ],
-          ])),
-        const Icon(Icons.unfold_more_rounded,
-          color: BMHColors.inkDim, size: 16),
-      ])));
 
   // ── SMALL PIECES ────────────────────────────────────────
   Widget _label(String s) => Padding(
@@ -767,23 +806,28 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
   Widget _strengthField() {
     if (_strengthOptions.isEmpty) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 11),
         decoration: BoxDecoration(
           color: BMHColors.bg3,
           borderRadius: BorderRadius.circular(BMHRadius.md),
           border: Border.all(color: BMHColors.line)),
-        child: TextField(
-          controller: TextEditingController(text: _strength)
-            ..selection = TextSelection.collapsed(offset: _strength.length),
-          keyboardType: TextInputType.number,
+        child: Center(child: TextField(
+          controller: _strengthC,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           onChanged: (v) => _strength = v,
           style: BMHText.bodySm.copyWith(
-            fontSize: 12, color: BMHColors.ink),
-          decoration: const InputDecoration(
+            fontSize: 12.5, color: BMHColors.ink),
+          decoration: InputDecoration(
             isDense: true,
+            filled: false,
             border: InputBorder.none,
-            contentPadding: EdgeInsets.symmetric(vertical: 12),
-            hintText: '500')));
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+            hintText: '500',
+            hintStyle: BMHText.bodySm.copyWith(
+              fontSize: 12.5, color: BMHColors.inkMute)))));
     }
 
     final options = _strengthOptions
@@ -793,6 +837,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     return _dropdown(
       value: options.contains(_strength) ? _strength : options.first,
       items: options,
+      title: 'Strength',
       onChanged: (v) => setState(() {
         _strength = v;
         // Adopt the unit that ships with that strength, e.g. "60000 IU".
@@ -806,57 +851,142 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       }));
   }
 
+  /// One tap opens a titled sheet from the bottom. Same control for
+  /// Strength, Unit, Form and Quantity, so the four fields behave
+  /// identically and none of them cover the form while open.
   Widget _dropdown({
     required String value,
     required List<String> items,
     required ValueChanged<String> onChanged,
+    String? title,
   }) =>
-      Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: BMHColors.bg3,
-          borderRadius: BorderRadius.circular(BMHRadius.md),
-          border: Border.all(color: BMHColors.line)),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: value,
-            isExpanded: true,
-            isDense: true,
-            dropdownColor: BMHColors.bg3,
+      GestureDetector(
+        onTap: () => _openSheet(
+          title: title ?? 'Select',
+          items: items,
+          current: value,
+          onPick: onChanged),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 11),
+          decoration: BoxDecoration(
+            color: BMHColors.bg3,
             borderRadius: BorderRadius.circular(BMHRadius.md),
-            icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              color: BMHColors.inkDim, size: 17),
-            style: BMHText.bodySm.copyWith(
-              fontSize: 12, color: BMHColors.ink),
-            items: [
+            border: Border.all(color: BMHColors.line)),
+          child: Row(children: [
+            Expanded(child: Text(value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: BMHText.bodySm.copyWith(
+                fontSize: 12.5, color: BMHColors.ink))),
+            const SizedBox(width: 4),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+              color: BMHColors.inkDim, size: 18),
+          ])));
+
+  Future<void> _openSheet({
+    required String title,
+    required List<String> items,
+    required String current,
+    required ValueChanged<String> onPick,
+  }) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.55),
+        decoration: const BoxDecoration(
+          color: BMHColors.bg2,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(BMHRadius.lg)),
+          border: Border(
+            top: BorderSide(color: BMHColors.line),
+            left: BorderSide(color: BMHColors.line),
+            right: BorderSide(color: BMHColors.line))),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 36, height: 4,
+            decoration: BoxDecoration(
+              color: BMHColors.line,
+              borderRadius: BorderRadius.circular(BMHRadius.full))),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(children: [
+              Expanded(child: Text(title, style: BMHText.labelLg)),
+              GestureDetector(
+                onTap: () => Navigator.pop(ctx),
+                behavior: HitTestBehavior.opaque,
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.close_rounded,
+                    color: BMHColors.inkDim, size: 18))),
+            ])),
+          const SizedBox(height: 8),
+          Flexible(child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            children: [
               for (final i in items)
-                DropdownMenuItem(
-                  value: i,
-                  child: Text(i,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: BMHText.bodySm.copyWith(
-                      fontSize: 12, color: BMHColors.ink))),
-            ],
-            onChanged: (v) { if (v != null) onChanged(v); })));
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx, i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: i == current
+                        ? _accent.withOpacity(0.14)
+                        : BMHColors.bg3,
+                      borderRadius: BorderRadius.circular(BMHRadius.md),
+                      border: Border.all(
+                        color: i == current
+                          ? _accent.withOpacity(0.55)
+                          : BMHColors.line)),
+                    child: Row(children: [
+                      Expanded(child: Text(i,
+                        style: BMHText.bodyMd.copyWith(
+                          fontSize: 14,
+                          color: i == current
+                            ? BMHColors.ink : BMHColors.ink2))),
+                      if (i == current)
+                        const Icon(Icons.check_rounded,
+                          color: _accent, size: 17),
+                    ]))),
+            ])),
+          SizedBox(height: MediaQuery.of(ctx).padding.bottom + 6),
+        ])));
+    if (picked != null) onPick(picked);
+  }
 
   Widget _textField(TextEditingController c, String hint) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
     decoration: BoxDecoration(
       color: BMHColors.bg3,
       borderRadius: BorderRadius.circular(BMHRadius.md),
       border: Border.all(color: BMHColors.line)),
     child: TextField(
       controller: c,
-      style: BMHText.bodySm.copyWith(fontSize: 12, color: BMHColors.ink),
+      minLines: 3,
+      maxLines: 5,
+      textCapitalization: TextCapitalization.sentences,
+      style: BMHText.bodySm.copyWith(
+        fontSize: 13, color: BMHColors.ink, height: 1.45),
       decoration: InputDecoration(
         isDense: true,
+        filled: false,
         border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(vertical: 13),
         hintText: hint,
         hintStyle: BMHText.bodySm.copyWith(
-          fontSize: 12, color: BMHColors.inkMute))));
+          fontSize: 12.5, color: BMHColors.inkMute))));
 
   Widget _stepper() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

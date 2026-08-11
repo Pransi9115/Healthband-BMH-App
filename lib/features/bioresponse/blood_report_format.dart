@@ -523,49 +523,34 @@ class ReferenceBar extends StatelessWidget {
       final zs = marker.zoneStart, ze = marker.zoneEnd;
       final pos = marker.barPosition;
 
-      // Five zones: red, amber, green, amber, red. The amber
-      // shoulders sit just inside each edge and match the borderline
-      // status, so the strip and the label always agree.
-      final span = ze - zs;
-      final edge = span * 0.12;
-      final aLo = (zs + edge).clamp(0.0, 1.0);
-      final aHi = (ze - edge).clamp(0.0, 1.0);
-
-      Widget zone(double from, double to, Color c,
-          {bool roundLeft = false, bool roundRight = false}) {
-        final left = (from * w).clamp(0.0, w);
-        final width = ((to - from) * w).clamp(0.0, w);
-        if (width <= 0) return const SizedBox.shrink();
-        return Positioned(
-          left: left, width: width, top: 7,
-          child: Container(
-            height: 7,
-            decoration: BoxDecoration(
-              color: c,
-              borderRadius: BorderRadius.horizontal(
-                left: Radius.circular(roundLeft ? BMHRadius.full : 0),
-                right: Radius.circular(roundRight ? BMHRadius.full : 0)))));
-      }
-
-      return SizedBox(height: 20, child: Stack(children: [
-        zone(0, zs, BMHColors.rangeOut, roundLeft: true),
-        zone(zs, aLo, BMHColors.rangeEdge),
-        zone(aLo, aHi, BMHColors.rangeIn),
-        zone(aHi, ze, BMHColors.rangeEdge),
-        zone(ze, 1, BMHColors.rangeOut, roundRight: true),
-
-        // The needle is white, as in the printed report. A coloured
-        // needle on a coloured strip fights with the zone underneath
-        // it; white reads cleanly against all three.
+      // Matches the Biomarkers bar: a muted out-of-range track with
+      // the reference band laid over it, and a single needle that
+      // carries the status colour. Reads as data rather than as an
+      // alarm, and the two screens stay visually consistent.
+      return SizedBox(height: 18, child: Stack(children: [
         Positioned(
-          left: (pos * w - 2.5).clamp(0.0, w - 5), top: 4,
+          left: 0, right: 0, top: 5,
           child: Container(
-            width: 5, height: 13,
+            height: 8,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(2.5),
-              border: Border.all(
-                color: BMHColors.bg0.withOpacity(0.55), width: 1)))),
+              color: BMHColors.danger.withOpacity(0.16),
+              borderRadius: BorderRadius.circular(BMHRadius.full)))),
+        Positioned(
+          left: (zs * w).clamp(0.0, w),
+          width: ((ze - zs) * w).clamp(2.0, w),
+          top: 5,
+          child: Container(
+            height: 8,
+            decoration: BoxDecoration(
+              color: BMHColors.success.withOpacity(0.42),
+              borderRadius: BorderRadius.circular(BMHRadius.full)))),
+        Positioned(
+          left: (pos * w - 1.5).clamp(0.0, w - 3), top: 1,
+          child: Container(
+            width: 3, height: 16,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2)))),
       ]));
     });
   }
