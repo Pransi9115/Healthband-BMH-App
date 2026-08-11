@@ -33,6 +33,13 @@ class MedicineEntry {
   final List<String> affects;
   final String note;
 
+  /// Strengths that belong to one specific form, when the medicine is
+  /// supplied differently in different forms — 400 mg as a tablet but
+  /// 100 mg/5 ml as a suspension. Forms absent from this map fall back
+  /// to [strengths]. Keeping it optional means the 200-odd entries that
+  /// only come as tablets need no change at all.
+  final Map<String, List<String>> perForm;
+
   const MedicineEntry(
     this.generic,
     this.klass,
@@ -41,10 +48,29 @@ class MedicineEntry {
     this.forms, {
     this.affects = const [],
     this.note = '',
+    this.perForm = const {},
   });
 
   String get defaultStrength => strengths.isEmpty ? '' : strengths.first;
   String get defaultForm => forms.isEmpty ? 'Tablet' : forms.first;
+
+  /// The strengths this medicine actually comes in for [form].
+  ///
+  /// Empty means "we do not know" — the caller should offer a plain
+  /// number field rather than a list, which is what stops the app
+  /// suggesting 200 ml of a tablet-only strength.
+  List<String> strengthsFor(String form) {
+    final specific = perForm[form];
+    if (specific != null) return specific;
+    if (forms.contains(form)) return strengths;
+    return const [];
+  }
+
+  /// The strength shown when [form] is first selected.
+  String defaultStrengthFor(String form) {
+    final list = strengthsFor(form);
+    return list.isEmpty ? '' : list.first;
+  }
 
   /// "Metformin" or "Metformin (Glycomet)" when matched by brand.
   String displayFor(String query) {
@@ -89,6 +115,43 @@ class MedicineOptions {
     'Patch', 'Cream or ointment', 'Gel', 'Eye drops', 'Ear drops',
     'Suppository', 'Pessary', 'Lozenge',
   ];
+
+  /// Units that make sense for a given form. Offering every unit for
+  /// every form is what let a tablet end up measured in millilitres.
+  static List<String> unitsFor(String form) {
+    switch (form) {
+      case 'Syrup':
+      case 'Suspension':
+        return ['mg/5ml', 'mg/ml', 'mg', 'ml'];
+      case 'Oral drops':
+      case 'Eye drops':
+      case 'Ear drops':
+        return ['mg/ml', '%', 'mcg/ml', 'drops'];
+      case 'Injection':
+      case 'IV infusion':
+        return ['mg', 'mg/ml', 'g', 'IU', 'units', 'mcg'];
+      case 'Insulin pen':
+        return ['units', 'IU'];
+      case 'Inhaler':
+      case 'Rotacap':
+        return ['mcg', 'mg', 'puffs'];
+      case 'Nebuliser solution':
+        return ['mg/ml', 'mg', '%'];
+      case 'Nasal spray':
+        return ['mcg', 'mg/ml', '%'];
+      case 'Cream or ointment':
+      case 'Gel':
+        return ['%', 'mg/g'];
+      case 'Patch':
+        return ['mcg/hr', 'mg'];
+      case 'Sachet or powder':
+        return ['g', 'mg', 'mEq'];
+      case 'Lozenge':
+        return ['mg', 'mcg'];
+      default:
+        return ['mg', 'mcg', 'g', 'IU', 'units'];
+    }
+  }
 
   /// Quantity taken at each dose, offered per form.
   static List<String> quantitiesFor(String form) {
@@ -482,16 +545,29 @@ class MedicineCatalog {
     MedicineEntry('Paracetamol', 'Analgesic and antipyretic',
       ['Crocin', 'Dolo 650', 'Calpol', 'Paracip', 'Pacimol'],
       ['125 mg', '250 mg', '500 mg', '650 mg', '1000 mg'],
-      ['Tablet', 'Syrup', 'Suspension', 'Injection']),
+      ['Tablet', 'Syrup', 'Suspension', 'Injection'],
+      perForm: {
+        'Syrup':      ['125 mg/5ml', '250 mg/5ml'],
+        'Suspension': ['125 mg/5ml', '250 mg/5ml'],
+        'Injection':  ['150 mg/ml', '1000 mg'],
+      }),
     MedicineEntry('Ibuprofen', 'NSAID',
       ['Brufen', 'Combiflam', 'Ibugesic'],
       ['200 mg', '400 mg', '600 mg'], ['Tablet', 'Suspension'],
+      perForm: {
+        'Suspension': ['100 mg/5ml', '200 mg/5ml'],
+      },
       affects: ['Iron'],
       note: 'NSAIDs can irritate the stomach lining and cause slow blood '
           'loss, which shows up as low iron.'),
     MedicineEntry('Diclofenac', 'NSAID',
       ['Voveran', 'Dynapar', 'Diclonac'], ['50 mg', '75 mg', '100 mg'],
-      ['Tablet', 'Injection', 'Gel'], affects: ['Iron']),
+      ['Tablet', 'Injection', 'Gel'],
+      perForm: {
+        'Injection': ['25 mg/ml', '75 mg/3ml'],
+        'Gel':       ['1 %', '1.16 %'],
+      },
+      affects: ['Iron']),
     MedicineEntry('Aceclofenac', 'NSAID',
       ['Zerodol', 'Hifenac', 'Acemiz'], ['100 mg', '200 mg'], ['Tablet'],
       affects: ['Iron']),
@@ -544,13 +620,22 @@ class MedicineCatalog {
     // ── ANTIBIOTICS AND ANTIMICROBIALS ────────────────────
     MedicineEntry('Amoxicillin', 'Penicillin antibiotic',
       ['Mox', 'Novamox', 'Amoxil'], ['250 mg', '500 mg'],
-      ['Capsule', 'Suspension']),
+      ['Capsule', 'Suspension'],
+      perForm: {
+        'Suspension': ['125 mg/5ml', '250 mg/5ml'],
+      }),
     MedicineEntry('Amoxicillin and clavulanate', 'Penicillin antibiotic',
       ['Augmentin', 'Clavam', 'Moxikind-CV', 'Advent'],
-      ['375 mg', '625 mg', '1000 mg'], ['Tablet', 'Suspension']),
+      ['375 mg', '625 mg', '1000 mg'], ['Tablet', 'Suspension'],
+      perForm: {
+        'Suspension': ['228.5 mg/5ml', '457 mg/5ml'],
+      }),
     MedicineEntry('Azithromycin', 'Macrolide antibiotic',
       ['Azithral', 'Azee', 'Zithromax'], ['250 mg', '500 mg'],
-      ['Tablet', 'Suspension']),
+      ['Tablet', 'Suspension'],
+      perForm: {
+        'Suspension': ['100 mg/5ml', '200 mg/5ml'],
+      }),
     MedicineEntry('Clarithromycin', 'Macrolide antibiotic',
       ['Claribid', 'Crixan'], ['250 mg', '500 mg'], ['Tablet']),
     MedicineEntry('Cefixime', 'Cephalosporin antibiotic',

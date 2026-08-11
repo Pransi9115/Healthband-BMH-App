@@ -67,6 +67,14 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
   List<String> _strengthOptions = const [];
   List<String> _formOptions = MedicineOptions.forms;
 
+  /// The catalog entry behind the chosen medicine, kept so that
+  /// changing Form can re-derive the strengths and units that
+  /// actually belong to that form.
+  MedicineEntry? _entry;
+
+  /// Units valid for the current form.
+  List<String> get _unitOptions => MedicineOptions.unitsFor(_form);
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +82,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     if (e != null) {
       _nameC.text = e.name;
       _searchC.text = e.name;
+      _entry = MedicineCatalog.byGeneric(e.name);
       _brand = e.brand;
       _klass = e.klass;
       _strength = e.strength;
@@ -127,25 +136,41 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     setState(() {
       _picking = false;
       _freeText = true;
+      _entry = e;
       _nameC.text = e.generic;
       _klass = e.klass;
       _brand = _matchedBrand(e, _searchC.text);
-      _strengthOptions = e.strengths;
       _formOptions = _mergeForms(e.forms);
-      _form = e.defaultForm;
-      _quantity = MedicineOptions.quantitiesFor(_form).first;
       _catalogNote = e.note;
-
-      final parts = e.defaultStrength.split(' ');
-      _strength = parts.isNotEmpty ? parts.first : '';
-      _strengthC.text = _strength;
-      _unit = parts.length > 1 ? parts.sublist(1).join(' ') : 'mg';
+      _applyForm(e.defaultForm);
 
       _affects = List.of(e.affects);
       _affectsAuto = e.affects.isNotEmpty;
       _searchC.text = e.generic;
     });
     _searchFocus.unfocus();
+  }
+
+  /// Changing the form re-derives everything that depends on it, so
+  /// the four fields can never disagree — a suspension gets mg/5ml
+  /// strengths and millilitre doses, a tablet gets milligrams.
+  void _applyForm(String form) {
+    _form = form;
+    _quantity = MedicineOptions.quantitiesFor(form).first;
+
+    final list = _entry?.strengthsFor(form) ?? const <String>[];
+    _strengthOptions = list;
+
+    if (list.isNotEmpty) {
+      final parts = list.first.split(' ');
+      _strength = parts.first;
+      _strengthC.text = _strength;
+      _unit = parts.length > 1 ? parts.sublist(1).join(' ') : _unit;
+    }
+
+    // Keep the unit inside what this form allows.
+    final units = MedicineOptions.unitsFor(form);
+    if (!units.contains(_unit)) _unit = units.first;
   }
 
   /// When someone searched "Glycomet", remember that brand.
@@ -170,6 +195,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       _catalogNote = '';
       _affects = [];
       _affectsAuto = false;
+      _entry = null;
       _searchC.text = _nameC.text;
     });
     _searchFocus.unfocus();
@@ -325,9 +351,9 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                   children: [
                     _label('Unit'),
                     _dropdown(
-                      value: MedicineOptions.units.contains(_unit)
-                        ? _unit : MedicineOptions.units.first,
-                      items: MedicineOptions.units,
+                      value: _unitOptions.contains(_unit)
+                        ? _unit : _unitOptions.first,
+                      items: _unitOptions,
                       title: 'Unit',
                       onChanged: (v) => setState(() => _unit = v)),
                   ])),
@@ -341,10 +367,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                         ? _form : _formOptions.first,
                       items: _formOptions,
                       title: 'Form',
-                      onChanged: (v) => setState(() {
-                        _form = v;
-                        _quantity = MedicineOptions.quantitiesFor(v).first;
-                      })),
+                      onChanged: (v) => setState(() => _applyForm(v))),
                   ])),
               ]),
 

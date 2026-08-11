@@ -602,32 +602,51 @@ class _BloodBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = markerColor(marker.status, marker.highIsGood);
     return LayoutBuilder(builder: (ctx, box) {
       final w = box.maxWidth;
       final zs = marker.zoneStart, ze = marker.zoneEnd;
       final pos = marker.barPosition;
-      return SizedBox(height: 14, child: Stack(children: [
-        Positioned(
-          left: 0, right: 0, top: 3,
+
+      // Same five-zone strip as the blood report: red outside, amber
+      // shoulders for borderline, green inside. The two screens read
+      // the same way, so a marker never changes meaning between them.
+      final span = ze - zs;
+      final edge = span * 0.12;
+      final aLo = (zs + edge).clamp(0.0, 1.0);
+      final aHi = (ze - edge).clamp(0.0, 1.0);
+
+      Widget zone(double from, double to, Color c,
+          {bool roundLeft = false, bool roundRight = false}) {
+        final left = (from * w).clamp(0.0, w);
+        final width = ((to - from) * w).clamp(0.0, w);
+        if (width <= 0) return const SizedBox.shrink();
+        return Positioned(
+          left: left, width: width, top: 5,
           child: Container(
-            height: 8,
+            height: 7,
             decoration: BoxDecoration(
-              color: BMHColors.danger.withOpacity(0.16),
-              borderRadius: BorderRadius.circular(BMHRadius.full)))),
+              color: c,
+              borderRadius: BorderRadius.horizontal(
+                left: Radius.circular(roundLeft ? BMHRadius.full : 0),
+                right: Radius.circular(roundRight ? BMHRadius.full : 0)))));
+      }
+
+      return SizedBox(height: 18, child: Stack(children: [
+        zone(0, zs, BMHColors.rangeOut, roundLeft: true),
+        zone(zs, aLo, BMHColors.rangeEdge),
+        zone(aLo, aHi, BMHColors.rangeIn),
+        zone(aHi, ze, BMHColors.rangeEdge),
+        zone(ze, 1, BMHColors.rangeOut, roundRight: true),
+
         Positioned(
-          left: zs * w, width: ((ze - zs) * w).clamp(2.0, w), top: 3,
+          left: (pos * w - 2.5).clamp(0.0, w - 5), top: 2,
           child: Container(
-            height: 8,
+            width: 5, height: 13,
             decoration: BoxDecoration(
-              color: BMHColors.success.withOpacity(0.42),
-              borderRadius: BorderRadius.circular(BMHRadius.full)))),
-        Positioned(
-          left: (pos * w - 1.5).clamp(0.0, w - 3), top: 0,
-          child: Container(
-            width: 3, height: 14,
-            decoration: BoxDecoration(
-              color: c, borderRadius: BorderRadius.circular(2)))),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(2.5),
+              border: Border.all(
+                color: BMHColors.bg0.withOpacity(0.55), width: 1)))),
       ]));
     });
   }

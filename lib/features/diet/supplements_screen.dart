@@ -86,6 +86,7 @@ class _SupplementsScreenState extends State<SupplementsScreen> {
       : (SupplementPreset.all.any((p) => p.name == existing.name)
           ? existing.name : null);
     String? error;
+    final nameFocus = FocusNode();
 
     await showModalBottomSheet(
       context: context,
@@ -150,12 +151,16 @@ class _SupplementsScreenState extends State<SupplementsScreen> {
                 value: presetName,
                 onChanged: (v) {
                   if (v == null) {
-                    // Custom — clear back to a blank, typeable form.
+                    // Custom — clear back to a blank form and put the
+                    // cursor straight into Name, so it is obvious that
+                    // this is the field to type into.
                     setSheet(() {
                       presetName = null;
                       nameC.clear();
                       nutrients.clear();
                     });
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => nameFocus.requestFocus());
                   } else {
                     final p =
                       SupplementPreset.all.firstWhere((x) => x.name == v);
@@ -165,7 +170,7 @@ class _SupplementsScreenState extends State<SupplementsScreen> {
                 }),
 
               const SizedBox(height: 14),
-              _field(nameC, 'Name *', 'e.g. Vitamin D3'),
+              _field(nameC, 'Name *', 'e.g. Vitamin D3', focus: nameFocus),
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(child: _field(brandC, 'Brand', 'optional')),
@@ -444,7 +449,8 @@ class _SupplementsScreenState extends State<SupplementsScreen> {
         ])));
   }
 
-  Widget _field(TextEditingController c, String label, String hint) => Column(
+  Widget _field(TextEditingController c, String label, String hint,
+      {FocusNode? focus}) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(label.toUpperCase(),
@@ -453,6 +459,7 @@ class _SupplementsScreenState extends State<SupplementsScreen> {
       const SizedBox(height: 6),
       TextField(
         controller: c,
+        focusNode: focus,
         style: BMHText.bodyMd.copyWith(color: BMHColors.ink),
         cursorColor: _accent,
         decoration: InputDecoration(
@@ -715,45 +722,124 @@ class _SuppRow extends StatelessWidget {
 //  as one clear control.
 // ─────────────────────────────────────────────────────────
 class _SupplementDropdown extends StatelessWidget {
-  final String? value;                       // null → Custom
+  final String? value;
   final ValueChanged<String?> onChanged;
-  const _SupplementDropdown({
-    required this.value,
-    required this.onChanged,
-  });
+  const _SupplementDropdown({required this.value, required this.onChanged});
+
+  static const _customLabel = 'Custom — type your own';
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      decoration: BoxDecoration(
-        color: BMHColors.bg3,
-        borderRadius: BorderRadius.circular(BMHRadius.md),
-        border: Border.all(color: BMHColors.line)),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String?>(
-          isExpanded: true,
-          value: value,
-          dropdownColor: BMHColors.bg3,
+    return GestureDetector(
+      onTap: () => _open(context),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: BMHColors.bg3,
           borderRadius: BorderRadius.circular(BMHRadius.md),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-            color: BMHColors.ink2),
-          hint: Text('Custom — type your own',
-            style: BMHText.bodyMd.copyWith(color: BMHColors.ink2)),
-          style: BMHText.bodyMd.copyWith(color: BMHColors.ink),
-          items: [
-            DropdownMenuItem<String?>(
-              value: null,
-              child: Text('Custom — type your own',
-                style: BMHText.bodyMd.copyWith(color: BMHColors.ink2))),
-            for (final p in SupplementPreset.all)
-              DropdownMenuItem<String?>(
-                value: p.name,
-                child: Text(p.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: BMHText.bodyMd.copyWith(color: BMHColors.ink))),
-          ],
-          onChanged: onChanged)));
+          border: Border.all(color: BMHColors.line)),
+        child: Row(children: [
+          Expanded(child: Text(value ?? _customLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: BMHText.bodyMd.copyWith(
+              color: value == null ? BMHColors.ink2 : BMHColors.ink))),
+          const SizedBox(width: 6),
+          const Icon(Icons.keyboard_arrow_down_rounded,
+            color: BMHColors.ink2, size: 20),
+        ])));
+  }
+
+  /// A sheet rather than the stock dropdown overlay. The overlay
+  /// covered the Name field underneath it, so choosing "Custom" looked
+  /// as though nothing had happened and there was nowhere to type.
+  Future<void> _open(BuildContext context) async {
+    final names = <String?>[null, for (final p in SupplementPreset.all) p.name];
+    final picked = await showModalBottomSheet<Object>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.6),
+        decoration: const BoxDecoration(
+          color: BMHColors.bg2,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(BMHRadius.xl)),
+          border: Border(
+            top: BorderSide(color: BMHColors.line),
+            left: BorderSide(color: BMHColors.line),
+            right: BorderSide(color: BMHColors.line))),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 36, height: 4,
+            decoration: BoxDecoration(
+              color: BMHColors.line,
+              borderRadius: BorderRadius.circular(BMHRadius.full))),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(children: [
+              Expanded(child: Text('Choose a supplement',
+                style: BMHText.labelLg)),
+              GestureDetector(
+                onTap: () => Navigator.pop(ctx),
+                behavior: HitTestBehavior.opaque,
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.close_rounded,
+                    color: BMHColors.inkDim, size: 18))),
+            ])),
+          const SizedBox(height: 8),
+          Flexible(child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            children: [
+              for (final n in names)
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx, n ?? '__custom__'),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: n == value
+                        ? BMHColors.cyan.withOpacity(0.14)
+                        : BMHColors.bg3,
+                      borderRadius: BorderRadius.circular(BMHRadius.md),
+                      border: Border.all(
+                        color: n == value
+                          ? BMHColors.cyan.withOpacity(0.55)
+                          : BMHColors.line)),
+                    child: Row(children: [
+                      if (n == null) ...[
+                        const Icon(Icons.edit_outlined,
+                          color: BMHColors.cyan, size: 16),
+                        const SizedBox(width: 9),
+                      ],
+                      Expanded(child: Text(n ?? _customLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: BMHText.bodyMd.copyWith(
+                          fontSize: 14,
+                          color: n == null
+                            ? BMHColors.cyan
+                            : (n == value
+                                ? BMHColors.ink : BMHColors.ink2)))),
+                      if (n == value && n != null)
+                        const Icon(Icons.check_rounded,
+                          color: BMHColors.cyan, size: 17),
+                    ]))),
+            ])),
+          SizedBox(height: MediaQuery.of(ctx).padding.bottom + 6),
+        ])));
+
+    if (picked == null) return;                 // dismissed, change nothing
+    onChanged(picked == '__custom__' ? null : picked as String);
   }
 }
 
