@@ -14,8 +14,10 @@ workflows:
       app_store_connect: BMH
 
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.biohealthcare.bmhapp
       vars:
-        BUNDLE_ID: "com.biohealthcare.bmhapp"
         XCODE_WORKSPACE: "ios/Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
       flutter: stable
@@ -31,14 +33,6 @@ workflows:
           source: true
 
     scripts:
-
-      - name: Fetch signing files
-        script: |
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-          keychain initialize
-          keychain add-certificates
 
       - name: Install dependencies
         script: |
